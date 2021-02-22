@@ -14,20 +14,71 @@ from nilearn.glm.first_level import FirstLevelModel
 from load_confounds import Params9
 from sklearn.model_selection import KFold, LeaveOneGroupOut,train_test_split 
 from nilearn.decoding import Decoder
+from IPython.display import Markdown, display
 
 
 ######## Return string between methods(used to extract seesions and runs No.) ########
-def _between(value, a, b):
+def _between(value, before, after):
+    """
+    Parameters
+    ----------
+    value: str
+        File name which is a BIDS-formatted in the CNeuroMod datasets,
+        for which to extract a value between two characters.
+    before: str
+        First charcter or part of the file name
+    after: str
+        First charcter or part of the file name
+    """
+    
     # Find and validate before-part.
-    pos_a = value.find(a)
-    if pos_a == -1: return ""
+    pos_before = value.find(before)
+    if pos_before == -1: return 
     # Find and validate after part.
-    pos_b = value.find(b)
-    if pos_b == -1: return ""
+    pos_after = value.find(after)
+    if pos_after == -1: return 
     # Return middle part.
-    adjusted_pos_a = pos_a + len(a)
-    if adjusted_pos_a >= pos_b: return ""
-    return value[adjusted_pos_a:pos_b]
+    adjusted_pos_before = pos_before + len(before)
+    if adjusted_pos_before >= pos_after: return 
+    return value[adjusted_pos_before:pos_after]
+
+
+######## Define new conditions ########
+def new_conditions(datapath, event, task_label):
+    """
+    In some HCPtrt tasks, the trial types are relabeled, 
+    to have more clear labels for decoding.
+    (labels in HCPtrt are similar to HCP datase)
+     
+    Parameters
+    ----------
+    datapath: str
+        File-path to a BIDS-formatted events.tsv file in the CNeuroMod
+        project
+    task_label: string
+        The name of the task for which to generate beta maps        
+    """
+
+    df = pd.read_table(event)
+    
+    if task_label == 'wm':                    
+        df.trial_type = df.trial_type.astype(str) + '_' + df.stim_type.astype(str)
+        return df 
+    else:
+        return df
+    
+    
+# ######## Relabeling the trial_type in events files########
+# def _events_relabeling(ev_path, task_label):
+    
+#     df = pd.read_table(ev_path)
+    
+#     if task_label == 'wm':            
+#         df.trial_type = df.trial_type.astype(str) + '_' + df.stim_type.astype(str)
+#         return df 
+    
+#     else:
+#         return df
 
 
 ######## Generate Beta_maps ########
@@ -44,14 +95,14 @@ def _generate_beta_maps(scans, confounds, events, conditions, mask, fname, task_
         A list of pd.DataFrames or file paths for BIDS-formatted
         events.tsv files
     conditions: list
-        A list of conditions for which to generate beta maps.
-        Must correspond to trial_types in provided events
+        A list of conditions for which to generate beta maps
+        (correspond to trial_types in provided events)
     mask: str
-        The mask within which to process data
+        The mask within which to process data.
     fname: str
-        The filename with which to save the resulting maps.
+        The filename with which to save the resulting maps
     task_label: string
-        The name of the task for which to generate beta maps.
+        The name of the task for which to generate beta maps
         e.g., 'motor'
     """
 
@@ -67,7 +118,7 @@ def _generate_beta_maps(scans, confounds, events, conditions, mask, fname, task_
         ses = scan.split('_task')[0].split('fmriprep-20.1.0/')[1].partition('_')[2]
         temp_run = scan.split('run')[1]
         run = _between(temp_run, "-", "_")
-        session = ses + '_run-' + run 
+        session = ses + '_run-' + run
 
         glm.fit(run_imgs=scan, events=event, confounds=confound)
 
@@ -116,18 +167,25 @@ def postproc_task(subject, task_label, conditions, tpl_mask):
         the template
     """
 
-    root = '/home/SRastegarnia/hcptrt_decoding_Shima/DATA/cneuromod/hcptrt/sub-01/fmriprep-20.1.0/'
+    datapath = '/home/SRastegarnia/hcptrt_decoding_Shima/DATA/cneuromod/hcptrt/sub-01/fmriprep-20.1.0/'
     func = 'space-MNI152NLin2009cAsym_desc-preproc_bold.nii.gz'
     regr = 'desc-confounds_regressors.tsv'
 
-    scans = sorted(Path(root).rglob('*_task-{}*{}'.format(task_label, func)))
+    scans = sorted(Path(datapath).rglob('*_task-{}*{}'.format(task_label, func)))
     scans = [str(s) for s in scans]
 
-    regressors = sorted(Path(root).rglob('*_task-{}*{}'.format(task_label, regr)))
+    regressors = sorted(Path(datapath).rglob('*_task-{}*{}'.format(task_label, regr)))
     confounds = [pd.DataFrame.from_records(Params9().load(str(r))) for r in regressors]
 
-    events = sorted(Path(root).rglob('*_task-{}*events.tsv'.format(task_label)))
-    events = [pd.read_table(e) for e in events]
+    events = sorted(Path(datapath).rglob('*_task-{}*events.tsv'.format(task_label)))
+    events = [new_conditions(datapath, e, task_label) for e in events]
+    
+    
+#     if task_label == 'wm':
+#       events = [_events_relabeling(e) for e in events]
+#     else:
+#       events = [pd.read_table(e) for e in events]
+
 
     _generate_beta_maps(
         scans=scans, confounds=confounds, events=events, conditions=conditions, mask=tpl_mask,
@@ -150,8 +208,8 @@ def check_decoding(task_dir, task_label, tpl_mask):
         the template
     """
 
-    z_maps = sorted(Path(task_dir).rglob('*_task-{}*-postproc_new_P9.nii.gz'.format(task_label)))# SHIMA
-    z_maps = [str(z) for z in z_maps]# SHIMA    
+    z_maps = sorted(Path(task_dir).rglob('*_task-{}*-postproc_new_P9.nii.gz'.format(task_label))) # SH
+    z_maps = [str(z) for z in z_maps] # SH    
     conditions = Path(task_dir).rglob('*_{}_new_labels.csv'.format(task_label))
     sessions = Path(task_dir).rglob('*_{}_new_runs.csv'.format(task_label))
     
@@ -162,16 +220,69 @@ def check_decoding(task_dir, task_label, tpl_mask):
         cv = KFold(n_splits=5, random_state=None, shuffle=False)
         decoder = Decoder(estimator='svc', mask=tpl_mask,
                                    standardize=False, cv=cv,
-                                   scoring='accuracy')
+                               scoring='accuracy')
         decoder.fit(z_map, condition_idx, groups=session_idx)
+        
+        cv_sco = []
         scores_dict = decoder.cv_scores_
         for key in scores_dict:
+            cv_sco.append(np.mean(scores_dict[key]))
             print(key, np.mean(scores_dict[key]))
+        print('mean value:', np.mean(cv_sco),'\n')
+        
     # plot weight maps for the last subject to get a sense of contributing vox
     weights_dict = decoder.coef_img_
     for key in weights_dict:
-        plotting.plot_stat_map(weights_dict[key],
-                               title=f'Weight map for {key}', colorbar=True, 
-                               threshold=0.00007, display_mode='ortho')
+        plotting.plot_stat_map(weights_dict[key], title=f'Weight map for {key}', 
+                               colorbar=True, threshold=0.00007, display_mode='ortho', 
+                               black_bg = 'True')
     plt.show() 
 
+
+######## Print in Bold ######## 
+def printmd(string):
+    display(Markdown(string))
+    
+    
+# ######## Add a counter to each duplicated trials ######## 
+# def single_trial_type(datapath, events):   
+#     """
+#     Relabeling the trial_type to make each single 
+#     sub trial unique per sessions
+     
+#     Parameters
+#     ----------
+#     datapath: str
+#         File-path to a BIDS-formatted events.tsv file in the CNeuroMod
+#         project.
+#     task_label: string
+#         The name of the task for which to generate beta maps 
+#     events: list
+#         A list of pd.DataFrames or file paths for BIDS-formatted
+#         events.tsv files
+#     """
+#     trial_ev_file_idx = []
+
+#     for events_file in events_files:
+#         ev_file = pd.read_table(events_file)
+
+#     #     print(events_file)
+
+#         ev_name = events_file.split('fmriprep-20.1.0/')[1]
+#         mod_ev_filename = 'mod_' + ev_name
+#         mod_ev_filename = os.path.join(mod_ev_path, mod_ev_filename)
+#         dups = (ev_file.loc[ev_file['trial_type'].duplicated(),'trial_type'] + '_' +
+#                 ev_file.groupby('trial_type').cumcount().astype(str))+ '_' 
+#         ev_file.loc[dups.notnull(),'trial_type'] = dups
+
+#     #     ev_file['trial_type'] = ev_file['trial_type'] + ev_file['trial']
+
+
+#         mod_events_file = ev_file.to_csv(mod_ev_filename, sep="\t")
+#         trial_ev_file_idx.append(mod_events_file)
+
+
+#         trial_ev_file = mod_ev_path + 'mod_sub-01_ses-002_task-relational_run-02_events.tsv'
+#         trial_ev_file = pd.read_table(trial_ev_file)
+#         print(trial_ev_file.trial_type.head(20))
+    
