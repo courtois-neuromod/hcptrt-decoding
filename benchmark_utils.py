@@ -31,13 +31,15 @@ def _between(value, before, after):
         First charcter or part of the file name
     """
     
-    # Find and validate before-part.
+    # Find and validate before-part
     pos_before = value.find(before)
     if pos_before == -1: return 
-    # Find and validate after part.
+    
+    # Find and validate after part
     pos_after = value.find(after)
-    if pos_after == -1: return 
-    # Return middle part.
+    if pos_after == -1: return
+    
+    # Return middle part
     adjusted_pos_before = pos_before + len(before)
     if adjusted_pos_before >= pos_after: return 
     return value[adjusted_pos_before:pos_after]
@@ -67,19 +69,6 @@ def new_conditions(datapath, event, task_label):
     else:
         return df
     
-    
-# ######## Relabeling the trial_type in events files########
-# def _events_relabeling(ev_path, task_label):
-    
-#     df = pd.read_table(ev_path)
-    
-#     if task_label == 'wm':            
-#         df.trial_type = df.trial_type.astype(str) + '_' + df.stim_type.astype(str)
-#         return df 
-    
-#     else:
-#         return df
-
 
 ######## Generate Beta_maps ########
 def _generate_beta_maps(scans, confounds, events, conditions, mask, fname, task_label):
@@ -136,13 +125,13 @@ def _generate_beta_maps(scans, confounds, events, conditions, mask, fname, task_
 ######## Extract intended conditions for each task ######## 
 def conditions(event_file):
     
-    df = pd.read_table(event_file)
+#     df = pd.read_table(event_file)
 #     category = df.trial_type.str.split('_', n=1, expand=True)[1]
-    categories = list(df.trial_type)
+    categories = list(event_file.trial_type)
     unwanted = {'countdown', 'cross_fixation', 'Cue', 'new_bloc_right_hand', 
                 'new_bloc_right_foot','new_bloc_left_foot','new_bloc_tongue', 
                 'new_bloc_left_hand', 'new_bloc_control', 'new_bloc_relational',
-                'new_bloc_shape', 'new_bloc_face' 
+                'new_bloc_shape', 'new_bloc_face', 'countdown_nan', 'Cue_nan' 
                 }
     categories = [c for c in categories if c not in unwanted]
     conditions = list(set(categories))
@@ -180,13 +169,6 @@ def postproc_task(subject, task_label, conditions, tpl_mask):
     events = sorted(Path(datapath).rglob('*_task-{}*events.tsv'.format(task_label)))
     events = [new_conditions(datapath, e, task_label) for e in events]
     
-    
-#     if task_label == 'wm':
-#       events = [_events_relabeling(e) for e in events]
-#     else:
-#       events = [pd.read_table(e) for e in events]
-
-
     _generate_beta_maps(
         scans=scans, confounds=confounds, events=events, conditions=conditions, mask=tpl_mask,
         fname='{}_task-{}_{}'.format(subject, task_label, func.replace('preproc_bold', 'postproc_new_P9')),
@@ -227,7 +209,9 @@ def check_decoding(task_dir, task_label, tpl_mask):
         scores_dict = decoder.cv_scores_
         for key in scores_dict:
             cv_sco.append(np.mean(scores_dict[key]))
-            print(key, np.mean(scores_dict[key]))
+#             print(key, np.mean(scores_dict[key]))
+            print(key, round(np.mean(scores_dict[key]), 2))
+            
         print('mean value:', np.mean(cv_sco),'\n')
         
     # plot weight maps for the last subject to get a sense of contributing vox
@@ -237,6 +221,8 @@ def check_decoding(task_dir, task_label, tpl_mask):
                                colorbar=True, threshold=0.00007, display_mode='ortho', 
                                black_bg = 'True')
     plt.show() 
+    
+    round(a, 2)
 
 
 ######## Print in Bold ######## 
