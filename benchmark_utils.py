@@ -212,7 +212,7 @@ def check_decoding(task_dir, task_label, tpl_mask):
 #             print(key, np.mean(scores_dict[key]))
             print(key, round(np.mean(scores_dict[key]), 2))
             
-        print('mean value:', np.mean(cv_sco),'\n')
+        print('mean value:', round(np.mean(cv_sco), 2), '\n')
         
     # plot weight maps for the last subject to get a sense of contributing vox
     weights_dict = decoder.coef_img_
@@ -221,8 +221,6 @@ def check_decoding(task_dir, task_label, tpl_mask):
                                colorbar=True, threshold=0.00007, display_mode='ortho', 
                                black_bg = 'True')
     plt.show() 
-    
-    round(a, 2)
 
 
 ######## Print in Bold ######## 
