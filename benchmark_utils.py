@@ -16,6 +16,20 @@ from sklearn.model_selection import KFold, LeaveOneGroupOut,train_test_split
 from nilearn.decoding import Decoder
 from IPython.display import Markdown, display
 
+######## Global variables ########
+# datapath = '/home/SRastegarnia/hcptrt_decoding_Shima/DATA/cneuromod/hcptrt/fmriprep-20.2lts/{}/'.format(subject)
+# func = 'space-MNI152NLin2009cAsym_desc-preproc_bold.nii.gz'
+# tims = 'desc-confounds_timeseries.tsv'
+
+# scans = sorted(Path(datapath).rglob('*_task-{}*{}'.format(task_label, func)))
+# scans = [str(s) for s in scans]
+
+# timeseries = sorted(Path(datapath).rglob('*_task-{}*{}'.format(task_label, tims)))
+# confounds = [pd.DataFrame.from_records(Params9().load(str(t))) for t in timeseries]
+
+# events = sorted(Path(datapath).rglob('*_task-{}*events.tsv'.format(task_label)))
+# events = [new_conditions(datapath, e, task_label) for e in events]
+
 
 ######## Return string between methods(used to extract seesions and runs No.) ########
 def _between(value, before, after):
@@ -65,7 +79,12 @@ def new_conditions(datapath, event, task_label):
     
     if task_label == 'wm':                    
         df.trial_type = df.trial_type.astype(str) + '_' + df.stim_type.astype(str)
-        return df 
+        return df
+    
+    elif task_label == 'relational':
+        df.trial_type = df.trial_type.astype(str) + '_' + df.instruction.astype(str)
+        return df
+    
     else:
         return df
     
@@ -104,7 +123,7 @@ def _generate_beta_maps(scans, confounds, events, conditions, mask, fname, task_
     z_maps, condition_idx, session_idx = [], [], []
     for scan, event, confound in zip(scans, events, confounds):
         
-        ses = scan.split('_task')[0].split('fmriprep-20.1.0/')[1].partition('_')[2]
+        ses = scan.split('_task')[0].split('fmriprep-20.2lts/')[1].partition('_')[2]
         temp_run = scan.split('run')[1]
         run = _between(temp_run, "-", "_")
         session = ses + '_run-' + run
@@ -118,8 +137,8 @@ def _generate_beta_maps(scans, confounds, events, conditions, mask, fname, task_
 
     sid = fname.split('_')[0]  # safe since we set the filename
     nib.save(image.concat_imgs(z_maps), fname)
-    np.savetxt('{}_{}_new_labels.csv'.format(sid,task_label), condition_idx, fmt='%s')
-    np.savetxt('{}_{}_new_runs.csv'.format(sid,task_label), session_idx, fmt='%s')
+    np.savetxt('{}_{}_labels.csv'.format(sid,task_label), condition_idx, fmt='%s')
+    np.savetxt('{}_{}_runs.csv'.format(sid,task_label), session_idx, fmt='%s')
     
 
 ######## Extract intended conditions for each task ######## 
@@ -156,27 +175,27 @@ def postproc_task(subject, task_label, conditions, tpl_mask):
         the template
     """
 
-    datapath = '/home/SRastegarnia/hcptrt_decoding_Shima/DATA/cneuromod/hcptrt/sub-01/fmriprep-20.1.0/'
+    datapath = '/home/SRastegarnia/hcptrt_decoding_Shima/DATA/cneuromod/hcptrt/fmriprep-20.2lts/{}/'.format(subject)
     func = 'space-MNI152NLin2009cAsym_desc-preproc_bold.nii.gz'
-    regr = 'desc-confounds_regressors.tsv'
+    tims = 'desc-confounds_timeseries.tsv'
 
     scans = sorted(Path(datapath).rglob('*_task-{}*{}'.format(task_label, func)))
     scans = [str(s) for s in scans]
 
-    regressors = sorted(Path(datapath).rglob('*_task-{}*{}'.format(task_label, regr)))
-    confounds = [pd.DataFrame.from_records(Params9().load(str(r))) for r in regressors]
+    timeseries = sorted(Path(datapath).rglob('*_task-{}*{}'.format(task_label, tims)))
+    confounds = [pd.DataFrame.from_records(Params9().load(str(t))) for t in timeseries]
 
     events = sorted(Path(datapath).rglob('*_task-{}*events.tsv'.format(task_label)))
     events = [new_conditions(datapath, e, task_label) for e in events]
     
     _generate_beta_maps(
         scans=scans, confounds=confounds, events=events, conditions=conditions, mask=tpl_mask,
-        fname='{}_task-{}_{}'.format(subject, task_label, func.replace('preproc_bold', 'postproc_new_P9')),
+        fname='{}_task-{}_{}'.format(subject, task_label, func.replace('preproc_bold', 'postproc_P9')),
         task_label=task_label)
     
 
 ######## Decoder function ########    
-def check_decoding(task_dir, task_label, tpl_mask):   
+def check_decoding(subject,task_dir,task_label,tpl_mask):   
     """
     Parameters
     ----------
@@ -190,16 +209,18 @@ def check_decoding(task_dir, task_label, tpl_mask):
         the template
     """
 
-    z_maps = sorted(Path(task_dir).rglob('*_task-{}*-postproc_new_P9.nii.gz'.format(task_label))) # SH
+    z_maps = sorted(Path(task_dir).rglob('{}*_task-{}*-postproc_P9.nii.gz'.format(subject,task_label))) # SH
     z_maps = [str(z) for z in z_maps] # SH    
-    conditions = Path(task_dir).rglob('*_{}_new_labels.csv'.format(task_label))
-    sessions = Path(task_dir).rglob('*_{}_new_runs.csv'.format(task_label))
+    conditions = Path(task_dir).rglob('{}_{}_labels.csv'.format(subject,task_label))
+    sessions = Path(task_dir).rglob('{}_{}_runs.csv'.format(subject,task_label))
     
     for z_map, condition, session in zip(z_maps, conditions, sessions):
         condition_idx = pd.read_table(condition, header=None).values.ravel()
         session_idx = pd.read_table(session, header=None).values.ravel()
         # instantiate the relevant objects
-        cv = KFold(n_splits=5, random_state=None, shuffle=False)
+        cv = KFold(n_splits=5, random_state=None, shuffle=True)
+#         cv = LeaveOneGroupOut()
+        
         decoder = Decoder(estimator='svc', mask=tpl_mask,
                                    standardize=False, cv=cv,
                                scoring='accuracy')
@@ -216,10 +237,12 @@ def check_decoding(task_dir, task_label, tpl_mask):
         
     # plot weight maps for the last subject to get a sense of contributing vox
     weights_dict = decoder.coef_img_
+    
     for key in weights_dict:
-        plotting.plot_stat_map(weights_dict[key], title=f'Weight map for {key}', 
-                               colorbar=True, threshold=0.00007, display_mode='ortho', 
-                               black_bg = 'True')
+        
+        plotting.plot_glass_brain(weights_dict[key], title=f'Weight map for {key}', 
+                       colorbar=True,threshold=0.00008, cmap = 'magma',
+                       plot_abs=False, display_mode='lyrz')
     plt.show() 
 
 
@@ -269,4 +292,3 @@ def printmd(string):
 #         trial_ev_file = mod_ev_path + 'mod_sub-01_ses-002_task-relational_run-02_events.tsv'
 #         trial_ev_file = pd.read_table(trial_ev_file)
 #         print(trial_ev_file.trial_type.head(20))
-    
