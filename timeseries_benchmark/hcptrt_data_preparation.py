@@ -1,22 +1,24 @@
 import numpy as np
-import os
+import pandas as pd
+# import os
 import glob
-import h5py
-import matplotlib.pyplot as plt
+# import h5py
+# import matplotlib.pyplot as plt
 from load_confounds import Params9, Params24
 from nilearn.input_data import NiftiLabelsMasker
-import pandas as pd
-import utils
 from sklearn import preprocessing
-from sklearn.preprocessing import StandardScaler, LabelEncoder, OneHotEncoder
-from sklearn.model_selection import GridSearchCV, LeaveOneGroupOut, cross_val_score, train_test_split
-from sklearn.svm import SVC
 from numpy import savetxt
-from keras.models import Sequential
-from keras.layers import Dense
-from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
-from nilearn.plotting import plot_anat, show, plot_stat_map, plot_matrix
-from sklearn.neural_network import MLPClassifier
+
+import utils
+# from sklearn.preprocessing import StandardScaler, LabelEncoder, OneHotEncoder
+# from sklearn.model_selection import GridSearchCV, LeaveOneGroupOut, cross_val_score, train_test_split
+# from sklearn.svm import SVC
+
+# from keras.models import Sequential
+# from keras.layers import Dense
+# from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
+# from nilearn.plotting import plot_anat, show, plot_stat_map, plot_matrix
+# from sklearn.neural_network import MLPClassifier
 
 
 #################### Global variables ####################
@@ -29,6 +31,7 @@ pathevents = '/data/neuromod/DATA/cneuromod/hcptrt/'
 
 
 #################### Data preparation ####################
+
 
 def load_fmri_data(subject, modality, confounds):    
     
@@ -56,12 +59,14 @@ def load_fmri_data(subject, modality, confounds):
 
     bold_outname = out_path + subject + '_' + modality + '_fMRI2.npy'
     np.save(bold_outname, bold_files)
-#     bold_files = np.load(bold_outname, allow_pickle=True)
+    
+    a = np.load(bold_outname, allow_pickle=True)
+    bold_files = a
     
     print('### Reading Nifiti files is done!')
     print('-------------------------------------------------')
     
-    return bold_files, bold_outname  
+    return bold_files, masker, data_path
    
     
 def load_events_files(subject, modality):
@@ -138,7 +143,7 @@ def check_input(bold_files, events_files):
 
 #################### Labeling ####################
 
-def volume_labeling(bold_files, events_files, confounds, subject, modality):
+def volume_labeling(bold_files, events_files, confounds, subject, modality, masker, data_path):
 
     """
     Generating labels files for each volumes using 
@@ -183,18 +188,12 @@ def volume_labeling(bold_files, events_files, confounds, subject, modality):
             volume_no.append(volume_round)
 
         # Find the Qty of null ending volumes
-        sample_data = pathdata + subject + '/ses-001/func/' + subject + \
-                       '_ses-001_task-' + modality + '_run-1' + bold_suffix
-        
         ans_round = utils.sum_(volume_no)
-        
-        masker = NiftiLabelsMasker(labels_img = 'MIST_444.nii.gz', 
-                                   standardize=True, detrend = False, 
-                                   smoothing_fwhm = 5).fit()
-        
-        sample_fmri = masker.transform(sample_data, confounds = 
-                                       confounds.load(sample_data))
-        
+#         sample_data = pathdata + subject + '/ses-001/func/' + subject + \
+#                        '_ses-001_task-' + modality + '_run-1' + bold_suffix
+               
+        sample_fmri = masker.transform(data_path[0], confounds = confounds.
+                                     load(data_path[0]))        
         null_ending = sample_fmri.shape[0] - ans_round 
 
         # Generate timeseries labels considering the volume No.           

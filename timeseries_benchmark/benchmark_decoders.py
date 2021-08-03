@@ -9,9 +9,7 @@ from sklearn.metrics import classification_report, confusion_matrix
 from nilearn.plotting import plot_matrix
 from sklearn.svm import SVC
 from sklearn.model_selection import cross_val_score, train_test_split
-
 import warnings
-
 import visualization
 
 
@@ -143,7 +141,7 @@ def reading_data(subject, modality):
 
 ######################### Decoding #########################
 
-def bench_perceptron(final_bold_files, final_volume_labels, num_cond, epochs):
+def bench_perceptron(final_bold_files, final_volume_labels):
     
     """
     Multi Layer Perceptron Neural Networks 
@@ -165,6 +163,7 @@ def bench_perceptron(final_bold_files, final_volume_labels, num_cond, epochs):
 
     categories = np.unique(y)
     unique_conditions, order = np.unique(categories, return_index=True)
+    num_cond = len(set(categories))
     unique_conditions = unique_conditions[np.argsort(order)]
 
     labelencoder_y = LabelEncoder()
@@ -198,13 +197,12 @@ def bench_perceptron(final_bold_files, final_volume_labels, num_cond, epochs):
     
     
     # Compiling
-    classifier.compile(optimizer = 'adam', loss = 'sparse_categorical_crossentropy', metrics=['accuracy'])
+    classifier.compile(optimizer = 'adam', loss = 'categorical_crossentropy', metrics=['accuracy'])
+        
+    history = classifier.fit(X_train, y_train, batch_size = 5, epochs = 5, validation_split = 0.1)
     
-    
-#     history = classifier.fit(X_train, y_train, batch_size = 5, epochs = epochs, validation_split = 0.1)
-    
-    classifier.fit(X_train, y_train, batch_size = 5, epochs = epochs, validation_split = 0.1)
-    return X_test, y_test, X_train, y_train
+#     classifier.fit(X_train, y_train, batch_size = 5, epochs = epochs, validation_split = 0.1)
+#     return X_test, y_test, X_train, y_train
     
     plot_history = visualization.classifier_history (history)
     
@@ -281,28 +279,6 @@ def bench_svm(final_bold_files, final_volume_labels):
     
     
 '--------------------------------------------------------------------------------'
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
