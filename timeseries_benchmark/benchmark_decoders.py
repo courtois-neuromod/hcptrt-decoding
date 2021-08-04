@@ -5,9 +5,10 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder, OneHotEncoder
 from sklearn.model_selection import GridSearchCV, LeaveOneGroupOut, cross_val_score, train_test_split
 from keras.models import Sequential
 from keras.layers import Dense
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from nilearn.plotting import plot_matrix
 from sklearn.svm import SVC
+from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import cross_val_score, train_test_split
 import warnings
 import visualization
@@ -19,8 +20,8 @@ bold_suffix = 'space-MNI152NLin2009cAsym_desc-preproc_bold.nii.gz'
 pathdata = '/data/neuromod/DATA/cneuromod/hcptrt/derivatives/fmriprep-20.2lts/fmriprep/'
 pathevents = '/data/neuromod/DATA/cneuromod/hcptrt/'
 
-processed_data_path = '/home/SRastegarnia/hcptrt_decoding_Shima/hcptrt_decoding/'\
-            'timeseries_benchmark/outputs/'
+processed_data_path = '/home/SRastegarnia/hcptrt_decoding_Shima/' \
+                      'hcptrt_decoding/timeseries_benchmark/outputs/'
 
 
 ##################### Task Dictionary #####################
@@ -106,6 +107,12 @@ def bulid_dict_task_modularity(modality):
 ######################### Reading Data #########################
 
 def reading_data(subject, modality): 
+    
+    """
+    Reads the saved output filles of hcptrt_data_preparation script
+    
+    """
+    
     sample_events = pathevents + subject +  '/ses-001/func/' + subject + \
     '_ses-001_task-' + modality + '_run-01' + '_events.tsv'
     sample_events_file = pd.read_csv(sample_events, sep = "\t", encoding = "utf8", header = 0)
@@ -141,84 +148,6 @@ def reading_data(subject, modality):
 
 ######################### Decoding #########################
 
-def bench_perceptron(final_bold_files, final_volume_labels):
-    
-    """
-    Multi Layer Perceptron Neural Networks 
-    Decoder, with two dense layers.
-    
-    Parameters
-    ----------
-    final_bold_files: 'numpy.ndarray' file
-       Generated & saved in output path 
-       using test_data_preparation script
-     
-    final_volume_labels: .csv file
-       Generated & saved in output path 
-       using test_data_preparation script
-    """
-    
-    X = final_bold_files
-    y = final_volume_labels
-
-    categories = np.unique(y)
-    unique_conditions, order = np.unique(categories, return_index=True)
-    num_cond = len(set(categories))
-    unique_conditions = unique_conditions[np.argsort(order)]
-
-    labelencoder_y = LabelEncoder()
-    y = labelencoder_y.fit_transform(y)
-    temp = np.reshape(y, (len(final_volume_labels),1))
-    y = temp
-
-    enc = OneHotEncoder(handle_unknown='ignore')
-    y = pd.DataFrame(enc.fit_transform(y).toarray())
-    encoded_values = print('label encoded values:', y, "\n")
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.1)
-
-    scaler = StandardScaler()
-    X_train = scaler.fit_transform(X_train)
-    X_test = scaler.transform(X_test) 
-    
-    
-    
-#     a = np.shape(y)
-#     return(a)
-    
-    # Initializing
-    warnings.filterwarnings('ignore')
-    classifier = Sequential()
-
-    classifier.add(Dense(222 , input_dim = 444, activation = 'relu'))
-    classifier.add(Dense(111, activation = 'relu'))
-    classifier.add(Dense(55, activation = 'relu'))
-    classifier.add(Dense(num_cond, activation = 'softmax'))
-    summary = classifier.summary()
-    
-    
-    # Compiling
-    classifier.compile(optimizer = 'adam', loss = 'categorical_crossentropy', metrics=['accuracy'])
-        
-    history = classifier.fit(X_train, y_train, batch_size = 5, epochs = 5, validation_split = 0.1)
-    
-#     classifier.fit(X_train, y_train, batch_size = 5, epochs = epochs, validation_split = 0.1)
-#     return X_test, y_test, X_train, y_train
-    
-    plot_history = visualization.classifier_history (history)
-    
-    # Making the predictions and evaluating the model
-    y_pred = classifier.predict(X_test)
-    y_pred = (y_pred > 0.5)
-
-    # Confusion matrix
-    cm_ann = confusion_matrix(y_test.values.argmax(axis = 1), y_pred.argmax(axis=1))
-    model_conf_matrix = cm_ann.astype('float') / cm_ann.sum(axis = 1)[:, np.newaxis]
-    title = 'Artificial Neural Networks confusion matrix'
-    visualization.conf_matrix(model_conf_matrix, unique_conditions, title)
-    
-
-
-'--------------------------------------------------------------------------------'
 
 def bench_svm(final_bold_files, final_volume_labels):
     
@@ -267,9 +196,9 @@ def bench_svm(final_bold_files, final_volume_labels):
     cv_scores_svm  = cross_val_score(model_svm , X_train, y_train, cv=5) 
     print(cv_scores_svm)
 
-    # Prediction accuracy
-    classification_accuracy_svm  = np.mean(cv_scores_svm)
-    classification_accuracy_svm
+    # The mean prediction accuracy
+    classification_accuracy_svm  = np.mean(cv_scores_svm )
+    print('mean accuracy:', classification_accuracy_svm)
     
     # Confusion matrix
     cm_svm = confusion_matrix(y_test, svm)
@@ -281,4 +210,116 @@ def bench_svm(final_bold_files, final_volume_labels):
 '--------------------------------------------------------------------------------'
 
 
+def bench_perceptron(final_bold_files, final_volume_labels):
+    
+    """
+    Multi Layer Perceptron Neural Networks 
+    Decoder, with two dense layers.
+    
+    Parameters
+    ----------
+    final_bold_files: 'numpy.ndarray' file
+       Generated & saved in output path 
+       using test_data_preparation script
+     
+    final_volume_labels: .csv file
+       Generated & saved in output path 
+       using test_data_preparation script
+    """
+    
+    X = final_bold_files
+    y = final_volume_labels
 
+    categories = np.unique(y)
+    unique_conditions, order = np.unique(categories, return_index=True)
+    num_cond = len(set(categories))
+    unique_conditions = unique_conditions[np.argsort(order)]
+
+    labelencoder_y = LabelEncoder()
+    y = labelencoder_y.fit_transform(y)
+    temp = np.reshape(y, (len(final_volume_labels),1))
+    y = temp
+
+    enc = OneHotEncoder(handle_unknown='ignore')
+    y = pd.DataFrame(enc.fit_transform(y).toarray())
+    encoded_values = print('label encoded values:', y, "\n")
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.1)
+
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test) 
+        
+    # Initializing
+    warnings.filterwarnings('ignore')
+    classifier = Sequential()
+
+    classifier.add(Dense(222 , input_dim = 444, activation = 'relu'))
+    classifier.add(Dense(111, activation = 'relu'))
+    classifier.add(Dense(55, activation = 'relu'))
+    classifier.add(Dense(num_cond, activation = 'softmax'))
+    summary = classifier.summary()
+    
+    
+    # Compiling
+    classifier.compile(optimizer = 'adam', loss = 'categorical_crossentropy', metrics=['accuracy'])
+        
+    history = classifier.fit(X_train, y_train, batch_size = 5, epochs = 5, validation_split = 0.1)   
+    plot_history = visualization.classifier_history (history)
+    
+    # Making the predictions and evaluating the model
+    y_pred = classifier.predict(X_test)
+    y_pred = (y_pred > 0.5)
+    
+    print ('mean accuracy score:', np.round(accuracy_score(y_test.values.argmax(axis = 1), y_pred.argmax(axis=1),
+                                normalize = True, sample_weight=None),2))
+
+    # Confusion matrix
+    cm_ann = confusion_matrix(y_test.values.argmax(axis = 1), y_pred.argmax(axis=1))
+    model_conf_matrix = cm_ann.astype('float') / cm_ann.sum(axis = 1)[:, np.newaxis]
+    title = 'Artificial Neural Networks confusion matrix'
+    visualization.conf_matrix(model_conf_matrix, unique_conditions, title)
+    
+
+'--------------------------------------------------------------------------------'
+
+def bench_nn(final_bold_files, final_volume_labels):
+    
+    X = final_bold_files
+    y = final_volume_labels
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1)
+
+    categories = np.unique(y)
+    unique_conditions, order = np.unique(categories, return_index=True)
+    unique_conditions = unique_conditions[np.argsort(order)]
+
+    model_nn = MLPClassifier()
+    model_nn.fit(X_train, y_train)
+
+    #accuracy
+    score = model_nn.score(X_test, y_test)
+
+    #print classification report
+    nn = model_nn.predict(X_test)
+    report = classification_report(y_test, nn)
+    print(report)
+    print("Test score with L1 penalty: %.4f" % score)
+    
+    # Cross validation
+    cv_scores_nn = cross_val_score(model_nn, X_train, y_train, cv=5) 
+    prediction_accuracy_nn = cv_scores_nn * 100
+    print('Prediction accuracy:', prediction_accuracy_nn)
+
+    # The mean prediction accuracy
+    classification_accuracy_nn = np.mean(cv_scores_nn)
+    print('mean accuracy:',classification_accuracy_nn)
+     
+    # Confusion matrix
+    cm_nn = confusion_matrix(y_test, nn)
+    model_conf_matrix = cm_nn.astype('float') / cm_nn.sum(axis = 1)[:, np.newaxis]
+    title = 'Naive Neural Networks confusion matrix'
+    visualization.conf_matrix(model_conf_matrix, unique_conditions, title)
+    
+    
+    
+    

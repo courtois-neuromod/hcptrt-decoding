@@ -1,24 +1,12 @@
 import numpy as np
 import pandas as pd
-# import os
 import glob
-# import h5py
-# import matplotlib.pyplot as plt
 from load_confounds import Params9, Params24
 from nilearn.input_data import NiftiLabelsMasker
 from sklearn import preprocessing
 from numpy import savetxt
 
 import utils
-# from sklearn.preprocessing import StandardScaler, LabelEncoder, OneHotEncoder
-# from sklearn.model_selection import GridSearchCV, LeaveOneGroupOut, cross_val_score, train_test_split
-# from sklearn.svm import SVC
-
-# from keras.models import Sequential
-# from keras.layers import Dense
-# from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
-# from nilearn.plotting import plot_anat, show, plot_stat_map, plot_matrix
-# from sklearn.neural_network import MLPClassifier
 
 
 #################### Global variables ####################
@@ -189,8 +177,6 @@ def volume_labeling(bold_files, events_files, confounds, subject, modality, mask
 
         # Find the Qty of null ending volumes
         ans_round = utils.sum_(volume_no)
-#         sample_data = pathdata + subject + '/ses-001/func/' + subject + \
-#                        '_ses-001_task-' + modality + '_run-1' + bold_suffix
                
         sample_fmri = masker.transform(data_path[0], confounds = confounds.
                                      load(data_path[0]))        
@@ -235,30 +221,72 @@ def volume_labeling(bold_files, events_files, confounds, subject, modality, mask
 
 '--------------------------------------------------------------------------------'
 
-def HRFlag_labeling(flat_volume_labels):
-    
-    HRFlag_volume_labels = []
-    b = 0
-    l = len(flat_volume_labels[:, 0]) 
+def HRFlag_labeling(flat_volume_labels, HRFlag_process):
 
-    while (b < (l- 1)):  
-        if (flat_volume_labels[b, 0] != flat_volume_labels[b + 1, 0]):
-            HRFlag_volume_labels.append(flat_volume_labels[b, 0])
+    if (HRFlag_process == '3_volume'):    
+        """
+        Labeling the first 3 volumes of stimulus longer than 5 seconds as HRF_lag
+        """
 
-            if (flat_volume_labels[b + 1, 0] == flat_volume_labels[b + 2, 0] == 
-                flat_volume_labels[b + 3, 0] == flat_volume_labels[b + 4, 0]):
-                for j in range (1, 4):
-                    HRFlag_volume_labels.append('HRF_lag')
-                b = b + 4  
+        HRFlag_volume_labels = []
+        counter = 0
+        lenght = len(flat_volume_labels[:, 0]) 
+
+        while (counter < (lenght - 1)):  
+            if (flat_volume_labels[counter, 0] != flat_volume_labels[counter + 1, 0]):
+                HRFlag_volume_labels.append(flat_volume_labels[counter, 0])
+
+                if (flat_volume_labels[counter + 1, 0] == flat_volume_labels[counter + 2, 0] == 
+                    flat_volume_labels[counter + 3, 0] == flat_volume_labels[counter + 4, 0]):
+                    for j in range (1, 4):
+                        HRFlag_volume_labels.append('HRF_lag')
+                    counter = counter + 4  
+                else:
+                    counter = counter + 1
+
             else:
-                b = b + 1
+                HRFlag_volume_labels.append(flat_volume_labels[counter, 0])
+                counter = counter + 1
 
-        else:
-            HRFlag_volume_labels.append(flat_volume_labels[b, 0])
-            b = b + 1
+        HRFlag_volume_labels.append(flat_volume_labels[lenght - 1, 0])
 
-    HRFlag_volume_labels.append(flat_volume_labels[l - 1, 0])
-    
+    elif (HRFlag_process == '2_1_volume'):    
+        """
+        Labeling the first volume of stimulus longer than 5 seconds as previous 
+        stimulus and the second and third as HRF_lag
+        """    
+
+        HRFlag_volume_labels = []
+        counter = 0
+        lenght = len(flat_volume_labels[:, 0]) 
+
+        while (counter < (lenght - 1)):  
+            if (flat_volume_labels[counter, 0] != flat_volume_labels[counter + 1, 0]):
+                HRFlag_volume_labels.append(flat_volume_labels[counter, 0])
+
+                if (flat_volume_labels[counter + 1, 0] == flat_volume_labels[counter + 2, 0] == 
+                    flat_volume_labels[counter + 3, 0] == flat_volume_labels[counter + 4, 0]):
+
+                    HRFlag_volume_labels.append(flat_volume_labels[counter, 0])
+                    for j in range (1, 3):
+                        HRFlag_volume_labels.append('HRF_lag')
+                    counter = counter + 4  
+                else:
+                    counter = counter + 1
+
+            else:
+                HRFlag_volume_labels.append(flat_volume_labels[counter, 0])
+                counter = counter + 1
+
+        HRFlag_volume_labels.append(flat_volume_labels[lenght - 1, 0])
+
+    else:
+        """
+        Labeling without considering the HRF lag
+        """  
+        temp = flat_volume_labels.tolist()
+        HRFlag_volume_labels = [item for sublist in temp for item in sublist]
+        
     print('### HRF lag labeling is done!')
     print('-----------------------------------------------')
     
@@ -267,8 +295,7 @@ def HRFlag_labeling(flat_volume_labels):
 '--------------------------------------------------------------------------------'
 
 def unwanted_label_removal(events_files, HRFlag_volume_labels, flat_bold_files, modality):
-                                                                    
-    
+                                                                        
     categories = list(events_files[0].trial_type)
     unwanted = {'countdown','cross_fixation','Cue','new_bloc_right_hand', 
                 'new_bloc_right_foot','new_bloc_left_foot','new_bloc_tongue', 
