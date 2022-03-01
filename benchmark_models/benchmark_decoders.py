@@ -8,8 +8,7 @@ import matplotlib.pyplot as plt
 from nilearn.input_data import NiftiMasker
 from nilearn.plotting import plot_matrix
 from sklearn.preprocessing import StandardScaler, LabelEncoder, OneHotEncoder
-from sklearn.model_selection import GridSearchCV, LeaveOneGroupOut, train_test_split,
-KFold, cross_val_score, cross_val_predict
+from sklearn.model_selection import GridSearchCV, LeaveOneGroupOut, train_test_split, KFold, cross_val_score, cross_val_predict
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
