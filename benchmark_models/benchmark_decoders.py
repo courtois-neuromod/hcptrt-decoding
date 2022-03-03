@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import glob
 import os
+import sys
 import warnings
 import math
 import matplotlib.pyplot as plt
@@ -20,7 +21,7 @@ from termcolor import colored
 import random
 np.random.seed(0)
 
-sys.path.append(os.path.join("../"))
+sys.path.append(os.path.join("../.."))
 import visualization
 
 """
@@ -34,6 +35,7 @@ def _generate_all_modality_files(subject, modalities, region_approach,
     
     all_modality_concat_bold = []
     all_modality_concat_labels = []
+    parcels_no = []
     
     for modality in modalities:
         
@@ -67,8 +69,7 @@ def _generate_all_modality_files(subject, modalities, region_approach,
 
 
 
-
-def _svm_decoder(all_modality_concat_bold, all_modality_concat_labels, 
+def _grid_svm_decoder(all_modality_concat_bold, all_modality_concat_labels, 
                  subject, region_approach, HRFlag_process, results_outpath, resolution):
     
     """
@@ -95,38 +96,12 @@ def _svm_decoder(all_modality_concat_bold, all_modality_concat_labels,
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 0)   
     
-#     # prepare the cross-validation procedure
-#     cv = KFold(n_splits = 10, random_state = 0, shuffle = True)
-#     cv_scores_svm  = cross_val_score(model_svm , X_train, y_train, cv = 10)  # comment bud az ghabl
-
-    # Initializing the SVM model
-#     model_svm = SVC(decision_function_shape = 'ovo', random_state = 0, kernel='linear')
-       
-    model_svm = SVC()
-    model_svm.fit(X_train, y_train)
-
-    # evaluate model
-#     print('Accuracy of the prediction on the training set:')
-#     y_train_pred = cross_val_predict(model_svm, X_train, y_train, cv = cv)
-#     y_train_pred = model_svm.predict(X_train) # feb 23 ezafe shod
-#     print(classification_report(y_train, y_train_pred))
-    
-    print('Accuracy of the prediction on the test set:')
-#     y_test_scores = cross_val_score(model_svm, X_test, y_test, 
-#                                     scoring='accuracy', cv=cv, n_jobs=-1)
-#     y_test_pred = cross_val_predict(model_svm, X_test, y_test, cv=cv)
-    y_test_pred = model_svm.predict(X_test) # feb 23 ezafe shod
-    print(classification_report(y_test, y_test_pred))
-#     print(y_test_scores)
-#     print('mean accuracy:%.4f' % np.mean(y_test_scores))
-
     # defining parameter range
     param_grid = {'C': [0.1, 1, 10, 100, 1000],
                   'gamma': [1, 0.1, 0.01, 0.001, 0.0001],
-                  'kernel': ['rbf', 'linear'],
-                  'random_state': [0, 101]}
+                  'kernel': ['rbf', 'linear']}
     
-    grid = GridSearchCV(SVC(), param_grid, refit = True, verbose = 3)
+    grid = GridSearchCV(SVC(max_iter=300, random_state=0), param_grid, refit=True, verbose=3) #SVC(random_state=0)
     
     # fitting the model for grid search
     grid.fit(X_train, y_train)
@@ -144,29 +119,145 @@ def _svm_decoder(all_modality_concat_bold, all_modality_concat_labels,
     
     # confusion matrix
     cm_svm = confusion_matrix(y_test, y_test_pred)
-    model_conf_matrix = cm_svm.astype('float') / cm_svm.sum(axis = 1)[:, np.newaxis]
+    model_conf_matrix = cm_svm.astype('float') / cm_svm.sum(axis=1)[:, np.newaxis]
         
     visualization.conf_matrix(model_conf_matrix, unique_conditions, 
                               title, results_outpath, output_file_name)
                               
-#     visualization.linear_decoder_weights(model_svm)
 
-#     if region_approach == 'MIST':
-#         masker = NiftiLabelsMasker(labels_img = '{}_{}.nii.gz'.format(region_approach,resolution), 
-#                                    standardize=True, smoothing_fwhm = 5)
-#     elif region_approach == 'dypac':
-#         file_mask = os.path.join('/data/cisl/pbellec/models/{}_space-MNI152NLin2009cAsym' \
-#                                  '_label-GM_mask.nii.gz'.format(subject))
-#         masker = NiftiMasker(standardize=True, detrend=False, smoothing_fwhm=5, mask_img=file_mask)
+
+def _svm_decoder(all_modality_concat_bold, all_modality_concat_labels, 
+                 subject, region_approach, HRFlag_process, results_outpath, resolution):
+    
+    """
+    Support Vector Machine classifier.
+    """
+
+    title = '{} Support Vector Machine using {}{}, {} HRFlag'.format(subject, region_approach, 
+                                                                   resolution, HRFlag_process) 
+    
+    output_file_name = '{}_SVM_{}{}_{}_HRFlag'.format(subject, region_approach,
+                                                      resolution, HRFlag_process)      
+    
+    X = all_modality_concat_bold
+    y = all_modality_concat_labels
+    
+    categories = np.unique(y)
+    unique_conditions, order = np.unique(categories, return_index=True)
+    unique_conditions = unique_conditions[np.argsort(order)]
+    
+    # Encoding the string to numerical values
+    labelencoder_y = LabelEncoder()
+    y = labelencoder_y.fit_transform(y)
+    y = y.ravel()
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)   
+       
+    model_svm = SVC(kernel='rbf', random_state=0, C=1)
+    model_svm.fit(X_train, y_train)
+
+    # evaluate model
+#     print('Accuracy of the prediction on the training set:')
+#     y_train_pred = model_svm.predict(X_train)
+#     print(classification_report(y_train, y_train_pred))
+    
+    print('Accuracy of the prediction on the test set:')
+    y_test_pred = model_svm.predict(X_test)
+    print(classification_report(y_test, y_test_pred))
+    
+    # confusion matrix
+    cm_svm = confusion_matrix(y_test, y_test_pred)
+    model_conf_matrix = cm_svm.astype('float') / cm_svm.sum(axis = 1)[:, np.newaxis]
         
-#     coef_img = masker.inverse_transform(model_svm.coef_[0, :])
-#     plotting.view_img(coef_img, title="SVM weights map", dim=-1, 
-#                       resampling_interpolation='nearest') # bg_img=haxby_dataset.anat[0],                                 
+    visualization.conf_matrix(model_conf_matrix, unique_conditions, 
+                              title, results_outpath, output_file_name)
+                                                              
                            
 
     
+def _grid_mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,  
+                      subject, region_approach, HRFlag_process, results_outpath, 
+                      resolution, parcel_no):
+    
+    """
+    Multi Layer Perceptron Neural Networks Decoder, with two dense layers,  
+    using sklearn mlp model with grid search for tuning the hyper parameters.
+    """
+    
+    title = '{} Scikit-Learn’s MLPClassifier using {}{}, {} HRFlag'.format(subject, region_approach,
+                                                                           resolution, HRFlag_process) 
+    
+    output_file_name = '{}_skl_mlp_{}{}_{}_HRFlag'.format(subject, region_approach,
+                                                      resolution, HRFlag_process)
+    
+    X = all_modality_concat_bold
+    y = all_modality_concat_labels
+    
+    categories = np.unique(y)
+    unique_conditions, order = np.unique(categories, return_index=True)
+    num_cond = len(set(categories))
+    unique_conditions = unique_conditions[np.argsort(order)]
+    
+    labelencoder_y = LabelEncoder()
+    y = labelencoder_y.fit_transform(y)
+    temp = np.reshape(y, (len(all_modality_concat_labels),1))
+    y = temp
+    
+    enc = OneHotEncoder(handle_unknown='ignore')
+    y_onehot = enc.fit_transform(np.array(y).reshape(-1, 1))
+    y = pd.DataFrame(y_onehot.toarray())
+    
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
+    
+    param_grid = {
+        'hidden_layer_sizes': [(int(resolution/(math.pow(2,1))),int(resolution/(math.pow(2,2))),
+                                int(resolution/(math.pow(2,3)))), 
+                               (int(resolution/(math.pow(2,1))),int(resolution/(math.pow(2,2)))), 
+                               (int(resolution/(math.pow(2,1))))],
+        'activation': ['tanh', 'relu'],
+        'solver': ['sgd', 'adam'],
+        'alpha': [0.0001, 0.05],
+        'learning_rate': ['constant','adaptive']}
+    
+    
+    grid = GridSearchCV(MLPClassifier(random_state=0), param_grid, 
+                        n_jobs=-1, cv=5, verbose=3) #MLPClassifier(max_iter=300, random_state=0)
+    grid.fit(X_train, y_train)
+
+    # Best paramete set
+    print(colored(('Best parameters found:\n'), 'red', attrs=['bold']),
+          grid.best_params_)
+    
+    # All results
+    means = grid.cv_results_['mean_test_score']
+    stds = grid.cv_results_['std_test_score']
+    for mean, std, params in zip(means, stds, grid.cv_results_['params']):
+        print("%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
+ 
+    # print how our model looks after hyper-parameter tuning
+    print(colored(('Best model estimation after hyper-parameter tuning:\n'),
+                  'red', attrs=['bold']), 
+          grid.best_estimator_)
+    
+    grid_predictions = grid.predict(X_test)
+
+    # print classification report
+    print('Results on the test set:')
+    print(classification_report(y_test, grid_predictions))
+    
+    # Confusion matrix
+    cm_ann = confusion_matrix(y_test.values.argmax(axis = 1), grid_predictions.argmax(axis=1))
+    model_conf_matrix = cm_ann.astype('float') / cm_ann.sum(axis = 1)[:, np.newaxis]
+    
+    visualization.conf_matrix(model_conf_matrix, unique_conditions, 
+                              title, results_outpath, output_file_name)
+    
+    
+    
+    
 def _mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,  
-                 subject, region_approach, HRFlag_process, results_outpath, resolution):
+                 subject, region_approach, HRFlag_process, results_outpath, 
+                 resolution, parcel_no):
     
     """
     Multi Layer Perceptron Neural Networks 
@@ -177,7 +268,7 @@ def _mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
                                                                                      resolution, HRFlag_process) 
 
     output_file_name = '{}_mlp_{}{}_{}_HRFlag'.format(subject, region_approach,
-                                                             resolution, HRFlag_process) 
+                                                      resolution, HRFlag_process) 
   
     X = all_modality_concat_bold
     y = all_modality_concat_labels
@@ -197,7 +288,7 @@ def _mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
     y = pd.DataFrame(y_onehot.toarray())
 #     y = pd.DataFrame(enc.fit_transform(y).toarray())
     encoded_values = print('label encoded values:', y, "\n")
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 0)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
@@ -206,54 +297,22 @@ def _mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
     # Initializing
     warnings.filterwarnings('ignore')
     model_mlp = Sequential()
+     
+    model_mlp.add(Dense(int(resolution/(math.pow(2,1))) , input_dim=parcel_no,
+                        kernel_initializer="uniform", activation='relu'))
 
-    if region_approach == 'MIST':        
-        model_mlp.add(Dense(int(resolution/(math.pow(2,1))) , input_dim = resolution,
-                            kernel_initializer="uniform", activation = 'relu'))
-        
-        model_mlp.add(Dense(int(resolution/(math.pow(2,2))), kernel_initializer="uniform",
-                            activation = 'relu'))
-        
-        model_mlp.add(Dense(int(resolution/(math.pow(2,3))), kernel_initializer="uniform",
-                           activation = 'relu'))
-        
-        model_mlp.add(Dense(num_cond, activation = 'softmax'))
-        
-        summary = model_mlp.summary()
-        
-    elif region_approach == 'difumo':
-        model_mlp.add(Dense(int(resolution/(math.pow(2,1))) , input_dim = resolution, 
-                            kernel_initializer="uniform", activation = 'relu'))
-        
-        model_mlp.add(Dense(int(resolution/(math.pow(2,2))), kernel_initializer="uniform",
-                            activation = 'relu'))
-        
-        model_mlp.add(Dense(int(resolution/(math.pow(2,3))), kernel_initializer="uniform",
-                            activation = 'relu'))
-        
-        model_mlp.add(Dense(num_cond, activation = 'softmax'))
-        summary = model_mlp.summary()
-        
-    elif region_approach == 'dypac':
-        model_mlp.add(Dense(int(resolution/(math.pow(2,1))) , input_dim = resolution, 
-                            kernel_initializer="uniform", activation = 'relu'))
-        
-        model_mlp.add(Dense(int(resolution/(math.pow(2,2))), kernel_initializer="uniform",
-                            activation = 'relu'))
-        
-        model_mlp.add(Dense(int(resolution/(math.pow(2,3))), kernel_initializer="uniform",
-                            activation = 'relu'))
-        
-        model_mlp.add(Dense(num_cond, activation = 'softmax'))
-        
-        summary = model_mlp.summary()
-        
-    else :
-        print('region_approach is not correctly defined.')
-        return()
-    
-    model_mlp.compile(optimizer = 'adam', loss = 'categorical_crossentropy', metrics=['accuracy'])        
-    history = model_mlp.fit(X_train, y_train, batch_size = 10, epochs = 5, validation_split = 0.2) 
+    model_mlp.add(Dense(int(resolution/(math.pow(2,2))), kernel_initializer="uniform",
+                        activation='relu'))
+
+    model_mlp.add(Dense(int(resolution/(math.pow(2,3))), kernel_initializer="uniform",
+                       activation='relu'))
+
+    model_mlp.add(Dense(num_cond, activation='softmax'))
+
+    summary = model_mlp.summary()
+            
+    model_mlp.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])        
+    history = model_mlp.fit(X_train, y_train, batch_size=10, epochs=5, validation_split=0.2) 
     
     plot_history = visualization.classifier_history (history, title, results_outpath, 
                                                      output_file_name)
@@ -261,7 +320,7 @@ def _mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
     # Making the predictions and evaluating the model
     y_test_pred = model_mlp.predict(X_test)
 #     y_test_pred = (y_pred > 0.5)
-    print(classification_report(y_test.values.argmax(axis = 1), y_test_pred.argmax(axis=1)))
+    print(classification_report(y_test.values.argmax(axis=1), y_test_pred.argmax(axis=1)))
     
 #     print ('mean accuracy score:', np.round(accuracy_score(y_test.values.argmax(axis = 1), 
 #                                                            y_pred.argmax(axis=1), normalize = True, 
@@ -277,33 +336,6 @@ def _mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
 
 
     
-def _skl_mlp_decoder():
-    
-    param_grid = {
-        'hidden_layer_sizes': [(50,50,50), (50,100,50), (100,)],
-        'activation': ['tanh', 'relu'],
-        'solver': ['sgd', 'adam'],
-        'alpha': [0.0001, 0.05],
-        'learning_rate': ['constant','adaptive']}
-    
-    
-    grid = GridSearchCV(MLPClassifier(max_iter=100), param_grid, n_jobs=-1, cv=5, verbose = 3)
-    grid.fit(X_train, y_train)
-
-    
-    print('Best parameters found:\n', grid.best_params_)
- 
-    # print how our model looks after hyper-parameter tuning
-    print('Best model estimation after hyper-parameter tuning:\n', grid.best_estimator_)
-    
-    grid_predictions = grid.predict(X_test)
-
-    # print classification report
-    print(classification_report(y_test, grid_predictions))
-    
-    
-    
-            
 def _knn_decoder(all_modality_concat_bold, all_modality_concat_labels,
                  subject, region_approach, HRFlag_process, results_outpath, resolution):
             
@@ -329,10 +361,10 @@ def _knn_decoder(all_modality_concat_bold, all_modality_concat_labels,
     y = labelencoder_y.fit_transform(y)
     y = y.ravel()
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 0)   
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)   
     
     # prepare the cross-validation procedure
-    cv = KFold(n_splits = 10, random_state = 0, shuffle = True)
+    cv = KFold(n_splits=10, random_state=0, shuffle=True)
 
     # Initializing the KNN model
     model_knn = KNeighborsClassifier(n_neighbors=8, algorithm='kd_tree') 
@@ -340,8 +372,8 @@ def _knn_decoder(all_modality_concat_bold, all_modality_concat_labels,
 
     # evaluate model
     scores = cross_val_score(model_knn, X_test, y_test, 
-                             scoring = 'accuracy', cv = cv, n_jobs = -1)    
-    y_pred = cross_val_predict(model_knn, X_test, y_test, cv = cv)
+                             scoring='accuracy', cv=cv, n_jobs=-1)    
+    y_pred = cross_val_predict(model_knn, X_test, y_test, cv=cv)
     report = classification_report(y_test, y_pred)
     
     print(report)
@@ -350,7 +382,7 @@ def _knn_decoder(all_modality_concat_bold, all_modality_concat_labels,
 
     # confusion matrix
     cm_knn = confusion_matrix(y_test, y_pred)
-    model_conf_matrix = cm_knn.astype('float') / cm_knn.sum(axis = 1)[:, np.newaxis] 
+    model_conf_matrix = cm_knn.astype('float') / cm_knn.sum(axis=1)[:, np.newaxis] 
     
     visualization.conf_matrix(model_conf_matrix, 
                               unique_conditions, 
@@ -382,19 +414,19 @@ def _random_forest_decoder(all_modality_concat_bold, all_modality_concat_labels,
     y = labelencoder_y.fit_transform(y)
     y = y.ravel()
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 0)   
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)   
     
     # prepare the cross-validation procedure
-    cv = KFold(n_splits = 10, random_state = 0, shuffle = True)
+    cv = KFold(n_splits=10, random_state=0, shuffle=True)
 
     # Initializing
-    model_rfc = RandomForestClassifier(max_depth=2, random_state = 0) 
+    model_rfc = RandomForestClassifier(max_depth=2, random_state=0) 
     # model_rfc.fit(X_train, y_train)
 
     # evaluate model
     scores = cross_val_score(model_rfc, X_test, y_test, 
-                             scoring = 'accuracy', cv = cv, n_jobs = -1)    
-    y_pred = cross_val_predict(model_rfc, X_test, y_test, cv = cv)
+                             scoring='accuracy', cv=cv, n_jobs=-1)    
+    y_pred = cross_val_predict(model_rfc, X_test, y_test, cv=cv)
     report = classification_report(y_test, y_pred)
     
     print(report)
@@ -403,7 +435,7 @@ def _random_forest_decoder(all_modality_concat_bold, all_modality_concat_labels,
 
     # confusion matrix
     cm_rfc = confusion_matrix(y_test, y_pred)
-    model_conf_matrix = cm_rfc.astype('float') / cm_rfc.sum(axis = 1)[:, np.newaxis] 
+    model_conf_matrix = cm_rfc.astype('float') / cm_rfc.sum(axis=1)[:, np.newaxis] 
               
         
 #     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.1, random_state = 0)
@@ -443,8 +475,7 @@ def _random_forest_decoder(all_modality_concat_bold, all_modality_concat_labels,
                               output_file_name)    
     
     
-    
-    
+        
 def postproc_benchmark_decoder(subject, modalities, decoders, region_approach, 
                                HRFlag_process, resolution): 
     
@@ -468,13 +499,21 @@ def postproc_benchmark_decoder(subject, modalities, decoders, region_approach,
                                                                                         region_approach,
                                                                                         HRFlag_process,
                                                                                         proc_data_path,
-                                                                                        resolution)        
-
+                                                                                        resolution)
+    
+    # getting the number of parcels, useful for soft parcellatin approaches like dypac        
+    df_path = proc_data_path + '/medial_data/fMRI2/{}/{}/{}/{}_wm_fMRI2.npy'. format(region_approach, 
+                                                                                     resolution, 
+                                                                                     subject, subject) 
+    df = np.load(df_path)
+    parcel_no = int(len(df[0][:][1]))
+    
     print('Generating concatenated bold and labels files is done, for',
           subject,'with',HRFlag_process,'HRFlag method,','\n',
           'and',region_approach,resolution,'parcelation approach.','\n')                
     print('all_modality_concat_bold shape', np.shape(all_modality_concat_bold))
     print('all_modality_concat_labels shape', np.shape(all_modality_concat_labels),'\n')
+    
 
     for decoder in decoders:
 
@@ -487,16 +526,19 @@ def postproc_benchmark_decoder(subject, modalities, decoders, region_approach,
                          HRFlag_process = HRFlag_process, 
                          results_outpath = results_outpath,
                          resolution = resolution)
+            
 
         elif decoder == 'mlp': 
             print(colored(('Multi Layer Perceptron Neural Networks classifier'\
                            '(two dense layers):'), attrs=['bold']))
             _mlp_decoder(all_modality_concat_bold = all_modality_concat_bold, 
-                                all_modality_concat_labels = all_modality_concat_labels,
-                                subject = subject, region_approach = region_approach,
-                                HRFlag_process = HRFlag_process,
-                                results_outpath = results_outpath,
-                                resolution = resolution)
+                         all_modality_concat_labels = all_modality_concat_labels,
+                         subject = subject, region_approach = region_approach,
+                         HRFlag_process = HRFlag_process,
+                         results_outpath = results_outpath,
+                         resolution = resolution, 
+                         parcel_no = parcel_no)
+            
 
         elif decoder == 'knn': 
             print(colored(('K-Nearest Neighbours classifier'), attrs=['bold']))
@@ -507,6 +549,7 @@ def postproc_benchmark_decoder(subject, modalities, decoders, region_approach,
                          HRFlag_process = HRFlag_process,
                          results_outpath = results_outpath,
                          resolution = resolution)
+            
 
         elif decoder == 'random_forest': 
             print(colored(('Random Forest classifier'), attrs=['bold']))
@@ -516,7 +559,30 @@ def postproc_benchmark_decoder(subject, modalities, decoders, region_approach,
                                    region_approach = region_approach, 
                                    HRFlag_process = HRFlag_process,
                                    results_outpath = results_outpath,
-                                   resolution = resolution)               
+                                   resolution = resolution)
+            
+            
+        elif decoder == 'grid_svm': 
+            print(colored(('Support Vector Machine classifier with grid search'), attrs=['bold']))
+            _grid_svm_decoder(all_modality_concat_bold = all_modality_concat_bold, 
+                              all_modality_concat_labels = all_modality_concat_labels,
+                              subject = subject, 
+                              region_approach = region_approach, 
+                              HRFlag_process = HRFlag_process,
+                              results_outpath = results_outpath,
+                              resolution = resolution) 
+            
+            
+        elif decoder == 'grid_mlp': 
+            print(colored(('Multi Layer Perceptron Neural Networks classifier with grid search'), attrs=['bold']))
+            _grid_mlp_decoder(all_modality_concat_bold = all_modality_concat_bold, 
+                              all_modality_concat_labels = all_modality_concat_labels,
+                              subject = subject, 
+                              region_approach = region_approach, 
+                              HRFlag_process = HRFlag_process,
+                              results_outpath = results_outpath,
+                              resolution = resolution,
+                              parcel_no = parcel_no) 
 
         else:
             print('The model is not defined')
