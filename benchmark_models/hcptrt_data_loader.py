@@ -92,6 +92,8 @@ class DataLoader():
                                      .format(self.subject, self.modality)+self.bold_suffix, 
                                      recursive=True))
         
+        print(data_path)
+        
         print(colored('{}, {}:'.format(self.subject, self.modality), attrs=['bold']))  
         
 #         for i in range(0, len(data_path)):
@@ -119,6 +121,7 @@ class DataLoader():
             
             fmri_t = []
             for dpath in data_path:
+                print('dpath: ', dpath)
                 
                 data_fmri = masker.fit_transform(dpath, confounds=self.confounds.load(dpath))    
                 fmri_t.append(data_fmri)
@@ -250,7 +253,7 @@ class DataLoader():
                                                                 'Face_0-Back','Face_2-Back',
                                                                 'Place_0-Back','Place_2-Back',
                                                                 'Tools_0-Back','Tools_2-Back'],
-                                                               ['body0b','body2b','face0b',
+                                                               ['zbody0b','body2b','face0b',
                                                                 'face2b','place0b','place2b',
                                                                 'tool0b','tool2b'])
             

@@ -3,6 +3,7 @@ import pandas as pd
 import pickle
 import glob
 import os
+import sys
 import nilearn.datasets
 from load_confounds import Params9, Params24
 from nilearn.input_data import NiftiLabelsMasker, NiftiMasker, NiftiMapsMasker
@@ -10,7 +11,7 @@ from sklearn import preprocessing
 from numpy import savetxt
 from termcolor import colored
 
-sys.path.append(os.path.join("../"))
+sys.path.append(os.path.join("../.."))
 import utils
 
 """
