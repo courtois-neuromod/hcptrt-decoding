@@ -3,7 +3,7 @@ import pandas as pd
 import glob
 import os
 import pickle
-from load_confounds import Params9, Params24
+#from load_confounds import Params9, Params24
 # from nilearn.input_data import NiftiLabelsMasker, NiftiMasker, NiftiMapsMasker
 from nilearn.maskers import NiftiLabelsMasker, NiftiMasker, NiftiMapsMasker
 from termcolor import colored

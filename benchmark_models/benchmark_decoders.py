@@ -6,7 +6,8 @@ import sys
 import warnings
 import math
 import matplotlib.pyplot as plt
-from nilearn.input_data import NiftiMasker
+#from nilearn.input_data import NiftiMasker
+from nilearn.maskers import NiftiLabelsMasker, NiftiMasker, NiftiMapsMasker
 from nilearn.plotting import plot_matrix
 from sklearn.preprocessing import StandardScaler, LabelEncoder, OneHotEncoder
 from sklearn.model_selection import GridSearchCV, LeaveOneGroupOut, train_test_split, KFold, cross_val_score, cross_val_predict
@@ -21,7 +22,7 @@ from termcolor import colored
 import random
 np.random.seed(0)
 
-sys.path.append(os.path.join("../.."))
+sys.path.append(os.path.join(".."))
 import visualization
 
 """

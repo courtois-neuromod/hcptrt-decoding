@@ -13,9 +13,10 @@ import matplotlib.pyplot as plt
 # from matplotlib.pyplot import *
 from pathlib import Path, PurePath
 from nilearn import image, plotting
-from nilearn.input_data import NiftiMasker, NiftiLabelsMasker
+#from nilearn.input_data import NiftiMasker, NiftiLabelsMasker
+from nilearn.maskers import NiftiLabelsMasker, NiftiMasker, NiftiMapsMasker
 from nilearn.glm.first_level import FirstLevelModel
-from load_confounds import Params9
+#from load_confounds import Params9
 import csv
 from csv import reader
 # from sklearn.model_selection import KFold,LeaveOneGroupOut,train_test_split,cross_val_score  
