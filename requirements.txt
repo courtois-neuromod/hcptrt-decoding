@@ -1,14 +1,17 @@
 dypac==0.6
+keras==2.6.0
 matplotlib==3.3.4
 nibabel==3.2.1
 nilearn==0.9.0
-numpy
+numpy==1.20.1
+packaging==21.0
 pandas==1.1.5
 plotly==5.3.1
 scikit-learn==0.24.2
+scipy==1.5.4
 seaborn==0.11.1
 sklearn==0.0
-tensorflow==2.6.0+computecanada
+tensorflow==2.7.0+computecanada
 termcolor==1.1.0
 torch==1.8.1+computecanada
 torch-cluster
@@ -16,3 +19,5 @@ torch-geometric
 torch-scatter
 torch-sparse
 torchvision==0.9.1
+typing-extensions==3.7.4.3
+
