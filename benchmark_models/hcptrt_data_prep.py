@@ -12,7 +12,7 @@ from sklearn import preprocessing
 from numpy import savetxt
 from termcolor import colored
 
-sys.path.append(os.path.join(".."))
+sys.path.append(os.path.join("../.."))
 import utils
 
 """

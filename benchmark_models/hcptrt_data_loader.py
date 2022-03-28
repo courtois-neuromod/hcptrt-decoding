@@ -10,6 +10,7 @@ from termcolor import colored
 import nilearn.datasets
 from dypac.masker import LabelsMasker, MapsMasker
 from nilearn.interfaces.fmriprep import load_confounds_strategy
+# from nilearn.interfaces.fmriprep import load_confounds
 
 """
 Utilities for first step of reading and processing hcptrt data.
@@ -19,11 +20,11 @@ The outputs are medial_data that are saved as fMRI2 and events2.
 
 class DataLoader():
     
-    def __init__(self, TR, confounds, modality, subject, 
+    def __init__(self, TR, modality, subject, 
                  bold_suffix, region_approach, resolution, 
                  fMRI2_out_path=None, events2_out_path=None, 
                  raw_data_path=None, pathevents=None, 
-                 raw_atlas_dir=None):        
+                 raw_atlas_dir=None):  #confounds,       
         
         """ 
         Initializer for DataLoader class.
@@ -59,7 +60,7 @@ class DataLoader():
         """
         
         self.TR = TR
-        self.confounds = confounds
+#         self.confounds = confounds
         self.modality = modality
         self.subject = subject
         self.bold_suffix = bold_suffix
@@ -92,8 +93,7 @@ class DataLoader():
                                      .format(self.subject, self.modality)+self.bold_suffix, 
                                      recursive=True))
         
-        print(data_path)
-        
+        print(data_path)        
         print(colored('{}, {}:'.format(self.subject, self.modality), attrs=['bold']))  
         
 #         for i in range(0, len(data_path)):
@@ -110,11 +110,10 @@ class DataLoader():
                 data_path.pop()
                                    
         print('The number of bold files:', len(data_path))
-        
  
         # generate masks
         if self.region_approach == 'MIST':
-            
+                                                                        
             masker = NiftiLabelsMasker(labels_img='{}_{}.nii.gz'.format(self.region_approach,
                                                                           self.resolution), 
                                        standardize=True, smoothing_fwhm=5)
@@ -123,7 +122,11 @@ class DataLoader():
             for dpath in data_path:
                 print('dpath: ', dpath)
                 
-                data_fmri = masker.fit_transform(dpath, confounds=self.confounds.load(dpath))    
+#                 data_fmri = masker.fit_transform(dpath, confounds=self.confounds.load(dpath)) #old nilearn
+                
+                conf = load_confounds_strategy(dpath, denoise_strategy="simple",
+                                               motion="basic", global_signal="basic") #new nilearn
+                data_fmri = masker.fit_transform(dpath, confounds=conf[0]) #new nilearn
                 fmri_t.append(data_fmri)
                 
                 print(dpath.split('func/', 1)[1])
@@ -142,11 +145,24 @@ class DataLoader():
             
             fmri_t = []
             for dpath in data_path:    
-                data_fmri = masker.fit_transform(dpath, confounds=self.confounds.load(dpath))    
+#                 data_fmri = masker.fit_transform(dpath, confounds=self.confounds.load(dpath)) #old nilearn
+                
+                conf = load_confounds_strategy(dpath, denoise_strategy="simple",
+                                               motion="basic", global_signal="basic") #new nilearn
+                data_fmri = masker.fit_transform(dpath, confounds=conf[0]) #new nilearn
+                
                 fmri_t.append(data_fmri)
         
-        
+
         elif self.region_approach == 'dypac':
+            
+#             LOAD_CONFOUNDS_PARAMS = {
+#                 "strategy": ["motion", "high_pass", "wm_csf", "global_signal"],
+#                 "motion": "basic",
+#                 "wm_csf": "basic",
+#                 "global_signal": "basic",
+#                 "demean": True
+#             } # costume confounds
             
             path_dypac = '/data/cisl/pbellec/models'
             file_mask = os.path.join(path_dypac, 
@@ -162,6 +178,8 @@ class DataLoader():
             for dpath in data_path:
                 
                 conf = load_confounds_strategy(dpath, denoise_strategy='simple', global_signal='basic')
+#                 conf = load_confounds(dpath, strategy=**LOAD_CONFOUNDS_PARAMS) # costume confounds      
+    
                 masker.fit(dpath)
                 maps_masker = MapsMasker(masker=masker, maps_img=file_dypac)
                 data_fmri = maps_masker.transform(img=dpath, confound=conf[0])
@@ -177,7 +195,14 @@ class DataLoader():
 
             fmri_t = []
             for dpath in data_path:    
-                data_fmri = masker.fit_transform(dpath, confounds=self.confounds.load(dpath))    
+#                 data_fmri = masker.fit_transform(dpath, confounds=self.confounds.load(dpath)) #old nilearn
+                
+                conf = load_confounds_strategy(dpath, denoise_strategy="simple",
+                                               motion="basic", global_signal="basic") #new nilearn
+                data_fmri = masker.fit_transform(dpath, confounds=conf[0]) #new nilearn
+                
+                
+                
                 fmri_t.append(data_fmri)
 
         print('### Reading Nifiti files is done!')
@@ -358,7 +383,7 @@ def _save_files(fmri_t, events_files, subject, modality,
     
 
     
-def postproc_data_loader(subject, modalities, confounds, region_approach, resolution):
+def postproc_data_loader(subject, modalities, region_approach, resolution): # confounds, 
     
     TR = 1.49    
     raw_data_path = '/data/neuromod/DATA/cneuromod/hcptrt/derivatives/fmriprep-20.2lts/fmriprep/'
@@ -376,7 +401,7 @@ def postproc_data_loader(subject, modalities, confounds, region_approach, resolu
     for modality in modalities:
         print(colored(modality,'red', attrs=['bold']))
 
-        load_data = DataLoader(TR = TR, confounds = confounds, 
+        load_data = DataLoader(TR = TR,  
                                modality = modality, subject = subject, 
                                bold_suffix = bold_suffix,
                                region_approach = region_approach,
@@ -385,7 +410,7 @@ def postproc_data_loader(subject, modalities, confounds, region_approach, resolu
                                events2_out_path = events2_out_path, 
                                raw_data_path = raw_data_path, 
                                pathevents = pathevents, 
-                               raw_atlas_dir = raw_atlas_dir)
+                               raw_atlas_dir = raw_atlas_dir) #confounds = confounds,
 
         fmri_t, masker, data_path  = load_data._load_fmri_data()
 
