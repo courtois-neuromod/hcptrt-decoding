@@ -282,14 +282,19 @@ def _unwanted_label_removal(events_files,HRFlag_volume_labels,
 
     
 
-def postproc_data_prep(subject, modalities, confounds, region_approach, HRFlag_process, resolution):
+def postproc_data_prep(subject, modalities, region_approach, HRFlag_process, resolution): # confounds, 
         
     """ 
     Outputs are 
     """    
-    
     TR = 1.49
-    proc_data_path = '/home/SRastegarnia/hcptrt_decoding_Shima/data/'
+
+#    ##### Elm #####
+#    proc_data_path = '/home/SRastegarnia/hcptrt_decoding_Shima/data/'
+
+    ##### CC #####
+    proc_data_path = '/home/rastegar/projects/def-pbellec/rastegar/hcptrt_decoding_shima/data/'
+
     bold_suffix = '_space-MNI152NLin2009cAsym_desc-preproc_bold.nii.gz'
     raw_atlas_dir = os.path.join(proc_data_path, "raw_atlas_dir")
     
@@ -355,7 +360,7 @@ def postproc_data_prep(subject, modalities, confounds, region_approach, HRFlag_p
 
         flat_bold_files, flat_volume_labels = _volume_labeling(bold_files = bold_files,
                                                                events_files = events_files, 
-                                                               confounds = confounds, 
+                                                             #   confounds = confounds, 
                                                                subject = subject, 
                                                                modality = modality, 
                                                                masker = masker, 

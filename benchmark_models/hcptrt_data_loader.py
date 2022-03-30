@@ -3,7 +3,7 @@ import pandas as pd
 import glob
 import os
 import pickle
-#from load_confounds import Params9, Params24
+# from load_confounds import Params9, Params24
 # from nilearn.input_data import NiftiLabelsMasker, NiftiMasker, NiftiMapsMasker
 from nilearn.maskers import NiftiLabelsMasker, NiftiMasker, NiftiMapsMasker
 from termcolor import colored
@@ -385,13 +385,23 @@ def _save_files(fmri_t, events_files, subject, modality,
     
 def postproc_data_loader(subject, modalities, region_approach, resolution): # confounds, 
     
-    TR = 1.49    
-    raw_data_path = '/data/neuromod/DATA/cneuromod/hcptrt/derivatives/fmriprep-20.2lts/fmriprep/'
-    proc_data_path = '/home/SRastegarnia/hcptrt_decoding_Shima/data/'
-    bold_suffix = '_space-MNI152NLin2009cAsym_desc-preproc_bold.nii.gz'    
-    pathevents = '/data/neuromod/projects/ml_models_tutorial/data/hcptrt/HCPtrt_events_DATA/'
-    raw_atlas_dir = os.path.join(proc_data_path, "raw_atlas_dir")
-    
+    TR = 1.49
+
+#    ##### Elm #####
+#    pathevents = '/data/neuromod/projects/ml_models_tutorial/data/hcptrt/HCPtrt_events_DATA/'
+#    raw_data_path = '/data/neuromod/DATA/cneuromod/hcptrt/derivatives/fmriprep-20.2lts/fmriprep/'
+#    proc_data_path = '/home/SRastegarnia/hcptrt_decoding_Shima/data/'
+
+
+    ##### CC #####
+    pathevents = '/home/rastegar/projects/def-pbellec/rastegar/Beluga_data/rastegar_hcptrt_decoding/data/hcptrt/'
+    raw_data_path = pathevents + 'derivatives/fmriprep-20.2lts/fmriprep/'
+    proc_data_path = '/home/rastegar/projects/def-pbellec/rastegar/hcptrt_decoding_shima/data/'
+
+
+    bold_suffix = '_space-MNI152NLin2009cAsym_desc-preproc_bold.nii.gz'
+
+    raw_atlas_dir = os.path.join(proc_data_path, "raw_atlas_dir") 
 
     fMRI2_out_path = proc_data_path + 'medial_data/fMRI2/{}/{}/{}/'.format(region_approach,
                                                                            resolution, subject)        
