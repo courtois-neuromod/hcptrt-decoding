@@ -8,6 +8,7 @@ import nilearn.datasets
 #from load_confounds import Params9, Params24
 #from nilearn.input_data import NiftiLabelsMasker, NiftiMasker, NiftiMapsMasker
 from nilearn.maskers import NiftiLabelsMasker, NiftiMasker, NiftiMapsMasker
+from nilearn.interfaces.fmriprep import load_confounds_strategy
 from sklearn import preprocessing
 from numpy import savetxt
 from termcolor import colored
@@ -38,8 +39,8 @@ def _reading_events2(subject, modality, events2_out_path, region_approach, resol
     return events_files
     
     
-def _volume_labeling(bold_files, events_files, confounds, 
-                     subject, modality, masker, data_path, TR):
+def _volume_labeling(bold_files, events_files, subject, 
+                     modality, masker, data_path, TR): # confounds,
 
     """
     Generating labels files for each volumes using 
@@ -52,8 +53,10 @@ def _volume_labeling(bold_files, events_files, confounds,
     """
     
     expected_volumes = np.shape(bold_files[1])[0]
-    sample_fmri = masker.fit_transform(data_path[0], confounds= confounds.
-                         load(data_path[0]))     
+
+    conf = load_confounds_strategy(dpath, denoise_strategy="simple", motion="basic", global_signal="basic") #new nilearn
+    sample_fmri = masker.fit_transform(data_path[0], confounds= conf[0])
+
     data_lenght = len(bold_files)
     
     labels_files = []    
