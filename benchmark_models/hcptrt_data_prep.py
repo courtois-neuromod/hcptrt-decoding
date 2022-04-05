@@ -13,7 +13,7 @@ from sklearn import preprocessing
 from numpy import savetxt
 from termcolor import colored
 
-sys.path.append(os.path.join("../.."))
+#sys.path.append(os.path.join(".."))
 import utils
 
 """
@@ -54,7 +54,7 @@ def _volume_labeling(bold_files, events_files, subject,
     
     expected_volumes = np.shape(bold_files[1])[0]
 
-    conf = load_confounds_strategy(dpath, denoise_strategy="simple", motion="basic", global_signal="basic") #new nilearn
+    conf = load_confounds_strategy(data_path[0], denoise_strategy="simple", motion="basic", global_signal="basic") #new nilearn
     sample_fmri = masker.fit_transform(data_path[0], confounds= conf[0])
 
     data_lenght = len(bold_files)
@@ -353,9 +353,14 @@ def postproc_data_prep(subject, modalities, region_approach, HRFlag_process, res
     for modality in modalities:
         print(colored(modality, attrs = ['bold']))
 
-        data_path = sorted(glob.glob('/data/neuromod/DATA/cneuromod/hcptrt/'\
+#        data_path = sorted(glob.glob('/data/neuromod/DATA/cneuromod/hcptrt/'\
+#                                     'derivatives/fmriprep-20.2lts/fmriprep/{}/**/*{}*'
+#                                     .format(subject, modality) + bold_suffix, recursive = True)) 
+
+        data_path = sorted(glob.glob('/home/rastegar/scratch/hcptrt/'\
                                      'derivatives/fmriprep-20.2lts/fmriprep/{}/**/*{}*'
-                                     .format(subject, modality) + bold_suffix, recursive = True))  
+                                     .format(subject, modality) + bold_suffix, recursive = True))
+
 
         bold_files = _reading_fMRI2(subject, modality, fMRI2_out_path, region_approach, resolution)
 

@@ -395,7 +395,8 @@ def postproc_data_loader(subject, modalities, region_approach, resolution): # co
 
     ##### CC #####
     pathevents = '/home/rastegar/projects/def-pbellec/rastegar/Beluga_data/rastegar_hcptrt_decoding/data/hcptrt/'
-    raw_data_path = pathevents + 'derivatives/fmriprep-20.2lts/fmriprep/'
+#    raw_data_path = pathevents + 'derivatives/fmriprep-20.2lts/fmriprep/'
+    raw_data_path = '/home/rastegar/scratch/hcptrt/derivatives/fmriprep-20.2lts/fmriprep'
     proc_data_path = '/home/rastegar/projects/def-pbellec/rastegar/hcptrt_decoding_shima/data/'
 
 
