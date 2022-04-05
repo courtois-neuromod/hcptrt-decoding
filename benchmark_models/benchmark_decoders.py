@@ -22,8 +22,10 @@ from termcolor import colored
 import random
 np.random.seed(0)
 
-sys.path.append(os.path.join(".."))
+# sys.path.append(os.path.join(".."))
 import visualization
+
+
 
 """
 Script for running benchmark models.
@@ -98,17 +100,18 @@ def _grid_svm_decoder(all_modality_concat_bold, all_modality_concat_labels,
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 0)   
     
     # defining parameter range
-    param_grid = {'C': [0.1, 1, 10, 100, 1000],
-                  'gamma': [1, 0.1, 0.01, 0.001, 0.0001],
-                  'kernel': ['rbf', 'linear']}
+    param_grid = {'C': [10], #[0.1, 1, 10, 100, 1000]
+                  'gamma': [0.001], #[1, 0.1, 0.01, 0.001, 0.0001]
+                  'kernel': ['rbf']} # ['rbf', 'linear']
     
-    grid = GridSearchCV(SVC(max_iter=300, random_state=0), param_grid, refit=True, verbose=3) #SVC(random_state=0)
+    grid = GridSearchCV(SVC(random_state=0), param_grid, refit=True, 
+                        n_jobs=-1, cv=5, verbose=3) #SVC(max_iter=300, random_state=0)
     
     # fitting the model for grid search
     grid.fit(X_train, y_train)
     
     # print best parameter after tuning
-    print(grid.best_params_)
+    print(colored(('Best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
  
     # print how our model looks after hyper-parameter tuning
     print('Best parameters found:\n', grid.best_estimator_)
@@ -119,7 +122,7 @@ def _grid_svm_decoder(all_modality_concat_bold, all_modality_concat_labels,
     print(classification_report(y_test, grid_predictions))
     
     # confusion matrix
-    cm_svm = confusion_matrix(y_test, y_test_pred)
+    cm_svm = confusion_matrix(y_test, grid_predictions)
     model_conf_matrix = cm_svm.astype('float') / cm_svm.sum(axis=1)[:, np.newaxis]
         
     visualization.conf_matrix(model_conf_matrix, unique_conditions, 
@@ -195,8 +198,8 @@ def _grid_mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
     y = all_modality_concat_labels
     
     categories = np.unique(y)
-    unique_conditions, order = np.unique(categories, return_index=True)
     num_cond = len(set(categories))
+    unique_conditions, order = np.unique(categories, return_index=True)    
     unique_conditions = unique_conditions[np.argsort(order)]
     
     labelencoder_y = LabelEncoder()
@@ -210,35 +213,38 @@ def _grid_mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
     
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
     
+    # defining parameter range
     param_grid = {
-        'hidden_layer_sizes': [(int(resolution/(math.pow(2,1))),int(resolution/(math.pow(2,2))),
-                                int(resolution/(math.pow(2,3)))), 
+        'hidden_layer_sizes': [
+#             (int(resolution/(math.pow(2,1))),int(resolution/(math.pow(2,2))),
+#                                 int(resolution/(math.pow(2,3)))), 
                                (int(resolution/(math.pow(2,1))),int(resolution/(math.pow(2,2)))), 
-                               (int(resolution/(math.pow(2,1))))],
-        'activation': ['tanh', 'relu'],
-        'solver': ['sgd', 'adam'],
-        'alpha': [0.0001, 0.05],
-        'learning_rate': ['constant','adaptive']}
+#                                (int(resolution/(math.pow(2,1))))
+                              ],
+        'activation': ['relu'], #['tanh', 'relu']
+        'solver': ['adam'], #['sgd','adam']
+        'alpha': [0.05], #[0.0001, 0.05, 0.1]
+        'learning_rate': ['constant']} #['constant','adaptive']
     
     
-    grid = GridSearchCV(MLPClassifier(random_state=0), param_grid, 
-                        n_jobs=-1, cv=5, verbose=3) #MLPClassifier(max_iter=300, random_state=0)
+    grid = GridSearchCV(MLPClassifier(random_state=0), param_grid, refit=True, 
+                        n_jobs=-1, cv=5, verbose=3) #MLPClassifier(max_iter=300, random_state=0) # cv=10,cv=5
+    
+    # fitting the model for grid search
     grid.fit(X_train, y_train)
 
-    # Best paramete set
-    print(colored(('Best parameters found:\n'), 'red', attrs=['bold']),
-          grid.best_params_)
+    # print best parameter after tuning
+    print(colored(('Best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
+    
+    # print how our model looks after hyper-parameter tuning
+    print(colored(('Best model estimation after hyper-parameter tuning:\n'),
+                  'red', attrs=['bold']), grid.best_estimator_)
     
     # All results
     means = grid.cv_results_['mean_test_score']
     stds = grid.cv_results_['std_test_score']
     for mean, std, params in zip(means, stds, grid.cv_results_['params']):
         print("%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
- 
-    # print how our model looks after hyper-parameter tuning
-    print(colored(('Best model estimation after hyper-parameter tuning:\n'),
-                  'red', attrs=['bold']), 
-          grid.best_estimator_)
     
     grid_predictions = grid.predict(X_test)
 
@@ -248,6 +254,7 @@ def _grid_mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
     
     # Confusion matrix
     cm_ann = confusion_matrix(y_test.values.argmax(axis = 1), grid_predictions.argmax(axis=1))
+#     cm_ann = confusion_matrix(y_test, grid_predictions)
     model_conf_matrix = cm_ann.astype('float') / cm_ann.sum(axis = 1)[:, np.newaxis]
     
     visualization.conf_matrix(model_conf_matrix, unique_conditions, 
@@ -305,9 +312,9 @@ def _mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
     model_mlp.add(Dense(int(resolution/(math.pow(2,2))), kernel_initializer="uniform",
                         activation='relu'))
 
-    model_mlp.add(Dense(int(resolution/(math.pow(2,3))), kernel_initializer="uniform",
-                       activation='relu'))
-
+#     model_mlp.add(Dense(int(resolution/(math.pow(2,3))), kernel_initializer="uniform",
+#                        activation='relu'))
+                
     model_mlp.add(Dense(num_cond, activation='softmax'))
 
     summary = model_mlp.summary()
