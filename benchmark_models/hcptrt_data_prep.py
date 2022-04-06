@@ -5,7 +5,7 @@ import glob
 import os
 import sys
 import nilearn.datasets
-#from load_confounds import Params9, Params24
+from load_confounds import Params9, Params24
 #from nilearn.input_data import NiftiLabelsMasker, NiftiMasker, NiftiMapsMasker
 from nilearn.maskers import NiftiLabelsMasker, NiftiMasker, NiftiMapsMasker
 from nilearn.interfaces.fmriprep import load_confounds_strategy
@@ -25,8 +25,9 @@ The outputs are final post-processed data.
 def _reading_fMRI2(subject, modality, fMRI2_out_path, region_approach, resolution):    
 
     bold_outname = fMRI2_out_path + subject + '_' + modality + '_fMRI2.npy'
+    print('bold_outname:', bold_outname)
     bold_files = np.load(bold_outname, allow_pickle=True)
-    
+    print('bold_files', bold_files)
     return bold_files
 
 
@@ -52,10 +53,12 @@ def _volume_labeling(bold_files, events_files, subject,
         output of load_events_files function
     """
     
+    print('BOLD_files:', bold_files)
     expected_volumes = np.shape(bold_files[1])[0]
 
     conf = load_confounds_strategy(data_path[0], denoise_strategy="simple", motion="basic", global_signal="basic") #new nilearn
     sample_fmri = masker.fit_transform(data_path[0], confounds= conf[0])
+#    sample_fmri = masker.fit_transform(data_path[0], confounds= confounds.load(data_path[0]))
 
     data_lenght = len(bold_files)
     
@@ -335,7 +338,8 @@ def postproc_data_prep(subject, modalities, region_approach, HRFlag_process, res
 
 
     fMRI2_out_path = proc_data_path + 'medial_data/fMRI2/{}/{}/{}/'.format(region_approach,
-                                                                           resolution, subject)         
+                                                                           resolution, subject)
+    print(fMRI2_out_path)
     events2_out_path = proc_data_path + 'medial_data/events2/{}/{}/{}/'.format(region_approach,
                                                                                resolution, subject)
 
@@ -361,11 +365,10 @@ def postproc_data_prep(subject, modalities, region_approach, HRFlag_process, res
                                      'derivatives/fmriprep-20.2lts/fmriprep/{}/**/*{}*'
                                      .format(subject, modality) + bold_suffix, recursive = True))
 
-
         bold_files = _reading_fMRI2(subject, modality, fMRI2_out_path, region_approach, resolution)
-
+        print(bold_files)     
         events_files = _reading_events2(subject, modality, events2_out_path, region_approach, resolution)
-
+        
         flat_bold_files, flat_volume_labels = _volume_labeling(bold_files = bold_files,
                                                                events_files = events_files, 
                                                              #   confounds = confounds, 

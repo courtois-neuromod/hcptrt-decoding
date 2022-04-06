@@ -93,7 +93,7 @@ class DataLoader():
                                      .format(self.subject, self.modality)+self.bold_suffix, 
                                      recursive=True))
         
-        print(data_path)        
+        print('Shima_data_path:', data_path)        
         print(colored('{}, {}:'.format(self.subject, self.modality), attrs=['bold']))  
         
 #         for i in range(0, len(data_path)):
@@ -394,9 +394,10 @@ def postproc_data_loader(subject, modalities, region_approach, resolution): # co
 
 
     ##### CC #####
-    pathevents = '/home/rastegar/projects/def-pbellec/rastegar/Beluga_data/rastegar_hcptrt_decoding/data/hcptrt/'
+#    pathevents = '/home/rastegar/projects/def-pbellec/rastegar/Beluga_data/rastegar_hcptrt_decoding/data/hcptrt/'
+    pathevents = '/home/rastegar/projects/def-pbellec/rastegar/hcptrt/HCPtrt_events_DATA/'
 #    raw_data_path = pathevents + 'derivatives/fmriprep-20.2lts/fmriprep/'
-    raw_data_path = '/home/rastegar/scratch/hcptrt/derivatives/fmriprep-20.2lts/fmriprep'
+    raw_data_path = '/home/rastegar/scratch/hcptrt/derivatives/fmriprep-20.2lts/fmriprep/'
     proc_data_path = '/home/rastegar/projects/def-pbellec/rastegar/hcptrt_decoding_shima/data/'
 
 
