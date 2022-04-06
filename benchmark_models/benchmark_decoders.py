@@ -21,6 +21,7 @@ from keras.layers import Dense
 from termcolor import colored
 import random
 np.random.seed(0)
+# import tensorflow as tf
 
 # sys.path.append(os.path.join(".."))
 import visualization
@@ -262,7 +263,8 @@ def _grid_mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
     
     
     
-    
+
+# Best acc=76%
 def _mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,  
                  subject, region_approach, HRFlag_process, results_outpath, 
                  resolution, parcel_no):
@@ -307,20 +309,21 @@ def _mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
     model_mlp = Sequential()
      
     model_mlp.add(Dense(int(resolution/(math.pow(2,1))) , input_dim=parcel_no,
-                        kernel_initializer="uniform", activation='relu'))
+                        kernel_initializer='uniform', activation='relu', use_bias=True,
+                        bias_initializer='zeros'))
 
-    model_mlp.add(Dense(int(resolution/(math.pow(2,2))), kernel_initializer="uniform",
-                        activation='relu'))
+    model_mlp.add(Dense(int(resolution/(math.pow(2,2))), kernel_initializer='uniform',
+                        activation='relu',use_bias=True, bias_initializer='zeros'))
 
 #     model_mlp.add(Dense(int(resolution/(math.pow(2,3))), kernel_initializer="uniform",
 #                        activation='relu'))
-                
+
     model_mlp.add(Dense(num_cond, activation='softmax'))
 
     summary = model_mlp.summary()
-            
-    model_mlp.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])        
-    history = model_mlp.fit(X_train, y_train, batch_size=10, epochs=5, validation_split=0.2) 
+    # sparse_categorical_crossentropy , 'categorical_crossentropy'       
+    model_mlp.compile(optimizer='adamax', loss='categorical_crossentropy', metrics=['accuracy'])        
+    history = model_mlp.fit(X_train, y_train, batch_size=10, epochs=15, validation_split=0.1) 
     
     plot_history = visualization.classifier_history (history, title, results_outpath, 
                                                      output_file_name)
@@ -330,9 +333,10 @@ def _mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
 #     y_test_pred = (y_pred > 0.5)
     print(classification_report(y_test.values.argmax(axis=1), y_test_pred.argmax(axis=1)))
     
-#     print ('mean accuracy score:', np.round(accuracy_score(y_test.values.argmax(axis = 1), 
-#                                                            y_pred.argmax(axis=1), normalize = True, 
-#                                                            sample_weight=None),2))
+    print ('mean accuracy score:', np.round(accuracy_score(y_test.values.argmax(axis = 1), 
+                                                           y_test_pred.argmax(axis=1), 
+                                                           normalize = True, 
+                                                           sample_weight=None),2))
 
     # Confusion matrix
     cm_ann = confusion_matrix(y_test.values.argmax(axis = 1), y_test_pred.argmax(axis=1))
@@ -340,8 +344,9 @@ def _mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
     
     visualization.conf_matrix(model_conf_matrix, unique_conditions, 
                               title, results_outpath, output_file_name)
-    
 
+
+#####################################################################################
 
     
 def _knn_decoder(all_modality_concat_bold, all_modality_concat_labels,
