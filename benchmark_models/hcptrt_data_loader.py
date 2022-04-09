@@ -389,7 +389,7 @@ def postproc_data_loader(subject, modalities, region_approach, resolution): # co
 
 #    ##### Elm #####
 #    pathevents = '/data/neuromod/projects/ml_models_tutorial/data/hcptrt/HCPtrt_events_DATA/'
-#    raw_data_path = '/data/neuromod/DATA/cneuromod/hcptrt/derivatives/fmriprep-20.2lts/fmriprep/'
+#    raw_data_path = '/data/neuromod/projects/ml_models_tutorial/data/hcptrt/derivatives/'
 #    proc_data_path = '/home/SRastegarnia/hcptrt_decoding_Shima/data/'
 
 
