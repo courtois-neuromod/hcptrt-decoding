@@ -92,21 +92,20 @@ class DataLoader():
         data_path = sorted(glob.glob(self.raw_data_path+'{}/**/*{}*'
                                      .format(self.subject, self.modality)+self.bold_suffix, 
                                      recursive=True))
-        
-        print('Shima_data_path:', data_path)        
+                
         print(colored('{}, {}:'.format(self.subject, self.modality), attrs=['bold']))  
         
 #         for i in range(0, len(data_path)):
 #             print(data_path[i].split('func/', 1)[1])
         
-        # make sure we don't exceed 15 runs.        
+        # make sure we don't exceed 14 runs.        
         if (len(data_path) > 15):
             data_extra_files = len(data_path) - 15 
             print(colored('Regressed out {} extra following fMRI file(s):'
                           .format(data_extra_files), 'red', attrs=['bold']))
-            for i in range(15, len(data_path)):
+            for i in range(14, len(data_path)):
                 print(colored(data_path[i].split('func/', 1)[1], 'red'))
-            for i in range(15, len(data_path)):
+            for i in range(14, len(data_path)):
                 data_path.pop()
                                    
         print('The number of bold files:', len(data_path))
@@ -120,7 +119,7 @@ class DataLoader():
             
             fmri_t = []
             for dpath in data_path:
-                print('dpath: ', dpath)
+                print(dpath.split('func/', 1)[1])
                 
 #                 data_fmri = masker.fit_transform(dpath, confounds=self.confounds.load(dpath)) #old nilearn
                 
@@ -129,8 +128,8 @@ class DataLoader():
                 data_fmri = masker.fit_transform(dpath, confounds=conf[0]) #new nilearn
                 fmri_t.append(data_fmri)
                 
-                print(dpath.split('func/', 1)[1])
-                print(data_fmri)
+#                print(dpath.split('func/', 1)[1])
+#                print(data_fmri)
                 print('shape:', np.shape(data_fmri))
               
             
@@ -187,7 +186,7 @@ class DataLoader():
                 
                 print('fMRI file:' ,dpath.split('func/', 1)[1])
                 print('shape:', np.shape(data_fmri), '\n')
-                print(data_fmri)
+#                print(data_fmri)
                 print('\n')
             
         else:
@@ -222,14 +221,14 @@ class DataLoader():
                                        .format(self.subject, self.modality), 
                                        recursive=True))
         
-        # make sure we don't exceed 15 runs.
-        if (len(events_path) > 15):
-            events_extra_files = len(events_path) - 15
+        # make sure we don't exceed 14 runs.
+        if (len(events_path) > 14):
+            events_extra_files = len(events_path) - 14
             print(colored('Regressed out {} extra following events file(s):'
                           .format(events_extra_files), 'red', attrs=['bold'])) 
-            for i in range(15, len(events_path)):
+            for i in range(14, len(events_path)):
                 print(colored(events_path[i].split('func/', 1)[1], 'red'))
-            for i in range(15, len(events_path)):
+            for i in range(14, len(events_path)):
                 events_path.pop()            
 
         print('The number of events files:', len(events_path))
@@ -238,9 +237,9 @@ class DataLoader():
         events_files = []
         for epath in events_path: 
             event = pd.read_csv(epath, sep="\t", encoding="utf8")
-            print(colored(epath.split('func/', 1)[1], 'blue', attrs=['bold']))
+            print(epath.split('func/', 1)[1])
             print(np.shape(event))
-            print(np.unique(event.trial_type))
+ #           print(np.unique(event.trial_type))
             
             if self.modality == 'emotion': 
                 event.trial_type = event['trial_type'].replace(['response_face',
@@ -282,9 +281,9 @@ class DataLoader():
                                                                 'face2b','place0b','place2b',
                                                                 'tool0b','tool2b'])
             
-            print(colored('After relabeling:', attrs=['bold']))
-            print(np.unique(event.trial_type), '\n')
-            print(event.trial_type.head(20))
+#            print(colored('After relabeling:', attrs=['bold']))
+#            print(np.unique(event.trial_type), '\n')
+#            print(event.trial_type.head(20))
 
             events_files.append(event)
         
@@ -394,8 +393,8 @@ def postproc_data_loader(subject, modalities, region_approach, resolution): # co
 
 
     ##### CC #####
-#    pathevents = '/home/rastegar/projects/def-pbellec/rastegar/Beluga_data/rastegar_hcptrt_decoding/data/hcptrt/'
-    pathevents = '/home/rastegar/projects/def-pbellec/rastegar/hcptrt/HCPtrt_events_DATA/'
+   # pathevents = '/home/rastegar/projects/def-pbellec/rastegar/hcptrt/HCPtrt_events_DATA/'
+    pathevents = '/home/rastegar/scratch/hcptrt/'
 #    raw_data_path = pathevents + 'derivatives/fmriprep-20.2lts/fmriprep/'
     raw_data_path = '/home/rastegar/scratch/hcptrt/derivatives/fmriprep-20.2lts/fmriprep/'
     proc_data_path = '/home/rastegar/projects/def-pbellec/rastegar/hcptrt_decoding_shima/data/'

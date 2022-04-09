@@ -27,7 +27,7 @@ def _reading_fMRI2(subject, modality, fMRI2_out_path, region_approach, resolutio
     bold_outname = fMRI2_out_path + subject + '_' + modality + '_fMRI2.npy'
     print('bold_outname:', bold_outname)
     bold_files = np.load(bold_outname, allow_pickle=True)
-    print('bold_files', bold_files)
+#    print('bold_files', bold_files)
     return bold_files
 
 
@@ -53,7 +53,7 @@ def _volume_labeling(bold_files, events_files, subject,
         output of load_events_files function
     """
     
-    print('BOLD_files:', bold_files)
+#    print('BOLD_files:', bold_files)
     expected_volumes = np.shape(bold_files[1])[0]
 
     conf = load_confounds_strategy(data_path[0], denoise_strategy="simple", motion="basic", global_signal="basic") #new nilearn
@@ -152,7 +152,7 @@ def _volume_labeling(bold_files, events_files, subject,
     
     print('bold type:', type(flat_bold_files))
     print('events type', type(flat_volume_labels)) 
-    print(flat_volume_labels)
+ #   print(flat_volume_labels)
     print('### Concatenating fMRI & events files is done!')
     print('-----------------------------------------------')
     
@@ -366,7 +366,7 @@ def postproc_data_prep(subject, modalities, region_approach, HRFlag_process, res
                                      .format(subject, modality) + bold_suffix, recursive = True))
 
         bold_files = _reading_fMRI2(subject, modality, fMRI2_out_path, region_approach, resolution)
-        print(bold_files)     
+#        print(bold_files)     
         events_files = _reading_events2(subject, modality, events2_out_path, region_approach, resolution)
         
         flat_bold_files, flat_volume_labels = _volume_labeling(bold_files = bold_files,
