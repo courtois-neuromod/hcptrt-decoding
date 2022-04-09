@@ -149,7 +149,7 @@ def postproc_time_windows(subject, region_approach, modalities, HRFlag_process, 
 #     proc_data_path = os.path.join('..','data','processed_data')
 #     concat_data_path = os.path.join('..','data','concat_data')
     
-    proc_data_path = '/home/SRastegarnia/hcptrt_decoding_Shima/data/'
+    proc_data_path = '/home/srastegarnia/hcptrt_decoding_Shima/data/'
     
     final_bold_out_path = proc_data_path + 'processed_data/proc_fMRI/{}/{}/{}/'.format(region_approach,
                                                                                     resolution, subject)       
