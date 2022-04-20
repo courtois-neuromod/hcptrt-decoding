@@ -144,57 +144,65 @@ def _remove_extra_volumes():
     """ 
     
         
-def postproc_time_windows(subject, region_approach, modalities, HRFlag_process, resolution): 
+def postproc_time_windows(subject, region_approach, modalities, HRFlag_process, resolutions): 
     
 #     proc_data_path = os.path.join('..','data','processed_data')
 #     concat_data_path = os.path.join('..','data','concat_data')
     
     proc_data_path = '/home/srastegarnia/hcptrt_decoding_Shima/data/'
     
-    final_bold_out_path = proc_data_path + 'processed_data/proc_fMRI/{}/{}/{}/'.format(region_approach,
-                                                                                    resolution, subject)       
-    final_labels_out_path = proc_data_path + 'processed_data/proc_events/{}/{}/{}/'.format(region_approach,
-                                                                                        resolution, subject)    
-    concat_out_path = proc_data_path + 'concat_data/{}/{}/{}/'.format(region_approach, 
-                                                                      resolution, subject) 
+    for resolution in resolutions:
     
-    print(colored('{}, {}, {}, res={}:'.format(subject, region_approach,
-                                               HRFlag_process, resolution), attrs=['bold']))  
-    
-    if not os.path.exists(concat_out_path):
-        os.makedirs(concat_out_path)
+        final_bold_out_path = proc_data_path + 'processed_data/proc_fMRI/{}/{}/{}/'.format(region_approach,
+                                                                                        resolution, subject)       
+        final_labels_out_path = proc_data_path + 'processed_data/proc_events/{}/{}/{}/'.format(region_approach,
+                                                                                            resolution, subject)    
+        concat_out_path = proc_data_path + 'concat_data/{}/{}/{}/'.format(region_approach, 
+                                                                          resolution, subject) 
 
-    # delete the old contents to avoid concatenating files multiple times
-    old_files = glob.glob(concat_out_path + '*')
+        print(colored('{}, {}, {}, res={}:'.format(subject, region_approach,
+                                                   HRFlag_process, resolution), attrs=['bold']))  
 
-    for f in old_files:
-        os.remove(f)
+        if not os.path.exists(concat_out_path):
+            os.makedirs(concat_out_path)
 
-    old_dirContents = os.listdir(concat_out_path)
-    print(concat_out_path)
-    print('old concat dir contents:', old_dirContents)
+        # delete the old contents to avoid concatenating files multiple times
+        old_files = glob.glob(concat_out_path + '*')
 
-    for modality in modalities:
-        print(colored((subject, modality), attrs=['bold']), '\n')
+        for f in old_files:
+            os.remove(f)
 
-        final_bold_name = final_bold_out_path + '{}_{}_{}_final_fMRI.npy'.format(subject, modality, 
-                                                                                 HRFlag_process)
-        final_bold_file = np.load(final_bold_name)
+        old_dirContents = os.listdir(concat_out_path)
+        print('old concat dir contents:', old_dirContents)
 
-        final_labels_name = final_labels_out_path + '{}_{}_{}_final_labels.csv'.format(subject, modality, 
-                                                                                HRFlag_process)
-        final_volume_labels = pd.read_csv(final_labels_name, sep='\t', 
-                                          encoding="utf8", header=None)
+        for modality in modalities:
 
-        concat_volume_num, concat_volume_labels = ـconcat_labels(final_volume_labels)
+            print(colored((subject, modality, resolution), attrs=['bold']), '\n')
 
-        if (len(old_dirContents) == 0 or len(old_dirContents) == 1):
-            concat_file_name = _concat_files(subject, modality, HRFlag_process, concat_out_path,
-                                             concat_volume_num, concat_volume_labels,
-                                             final_volume_labels, final_bold_file)
+            final_bold_name = final_bold_out_path + '{}_{}_{}_final_fMRI.npy'.format(subject, modality, 
+                                                                                     HRFlag_process)
+            print('processed bold file:', final_bold_name.split("data/", 1)[1])
+            final_bold_file = np.load(final_bold_name, allow_pickle=True)
+            print('bold file shape:', np.shape(final_bold_file))
 
-        else:
-            print('concat data path is not empty')
+            final_labels_name = final_labels_out_path + '{}_{}_{}_final_labels.csv'.format(subject, modality, 
+                                                                                    HRFlag_process)
+            print('processed label file:', final_labels_name.split("data/", 1)[1])
+            
+            final_volume_labels = pd.read_csv(final_labels_name, sep='\t', 
+                                              encoding="utf8", header=None)
+            print('label file shape:',np.shape(final_volume_labels))
+            ############################################################################
+
+            concat_volume_num, concat_volume_labels = ـconcat_labels(final_volume_labels)
+
+            if (len(old_dirContents) == 0 or len(old_dirContents) == 1):
+                concat_file_name = _concat_files(subject, modality, HRFlag_process, concat_out_path,
+                                                 concat_volume_num, concat_volume_labels,
+                                                 final_volume_labels, final_bold_file)
+
+            else:
+                print('concat data path is not empty')
 
     _generate_phenotypic_data(concat_out_path, subject, HRFlag_process)    
                         
