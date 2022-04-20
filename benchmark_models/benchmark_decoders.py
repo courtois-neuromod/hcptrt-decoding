@@ -5,17 +5,21 @@ import os
 import sys
 import warnings
 import math
+from time import time
 import matplotlib.pyplot as plt
 #from nilearn.input_data import NiftiMasker
 from nilearn.maskers import NiftiLabelsMasker, NiftiMasker, NiftiMapsMasker
 from nilearn.plotting import plot_matrix
 from sklearn.preprocessing import StandardScaler, LabelEncoder, OneHotEncoder
-from sklearn.model_selection import GridSearchCV, LeaveOneGroupOut, train_test_split, KFold, cross_val_score, cross_val_predict
+from sklearn.model_selection import GridSearchCV, LeaveOneGroupOut, train_test_split
+from sklearn.model_selection import RepeatedStratifiedKFold, KFold, cross_val_score, cross_val_predict
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+from sklearn.linear_model import LogisticRegression, RidgeClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
+from sklearn.naive_bayes import MultinomialNB, GaussianNB, ComplementNB, BernoulliNB 
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, BaggingClassifier
 from keras.models import Sequential
 from keras.layers import Dense
 from termcolor import colored
@@ -47,7 +51,7 @@ def _generate_all_modality_files(subject, modalities, region_approach,
                                  '{}*{}*{}*.npy'.format(region_approach, resolution, subject,  
                                                         subject, modality, HRFlag_process))
         
-        print(final_bold_outpath)
+#         print(final_bold_outpath)
         final_labels_outpath = glob.glob(proc_data_path + 'processed_data/proc_events/{}/{}/{}/' \
                                    '{}*{}*{}*.csv'.format(region_approach, resolution, subject, 
                                                           subject, modality, HRFlag_process))
@@ -73,11 +77,12 @@ def _generate_all_modality_files(subject, modalities, region_approach,
 
 
 
+
 def _grid_svm_decoder(all_modality_concat_bold, all_modality_concat_labels, 
                  subject, region_approach, HRFlag_process, results_outpath, resolution):
     
     """
-    Support Vector Machine classifier.
+    Support Vector Machine classifier with GridSearchCV.
     """
 
     title = '{} Support Vector Machine using {}{}, {} HRFlag'.format(subject, region_approach, 
@@ -98,15 +103,16 @@ def _grid_svm_decoder(all_modality_concat_bold, all_modality_concat_labels,
     y = labelencoder_y.fit_transform(y)
     y = y.ravel()
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 0)   
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)   
     
     # defining parameter range
     param_grid = {'C': [10], #[0.1, 1, 10, 100, 1000]
                   'gamma': [0.001], #[1, 0.1, 0.01, 0.001, 0.0001]
                   'kernel': ['rbf']} # ['rbf', 'linear']
     
+    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=0)
     grid = GridSearchCV(SVC(random_state=0), param_grid, refit=True, 
-                        n_jobs=-1, cv=5, verbose=3) #SVC(max_iter=300, random_state=0)
+                        n_jobs=-1, cv=cv, verbose=3) #SVC(max_iter=300, random_state=0)
     
     # fitting the model for grid search
     grid.fit(X_train, y_train)
@@ -124,13 +130,14 @@ def _grid_svm_decoder(all_modality_concat_bold, all_modality_concat_labels,
     
     # confusion matrix
     cm_svm = confusion_matrix(y_test, grid_predictions)
-    model_conf_matrix = cm_svm.astype('float') / cm_svm.sum(axis=1)[:, np.newaxis]
+    model_cm = cm_svm.astype('float') / cm_svm.sum(axis=1)[:, np.newaxis]
         
-    visualization.conf_matrix(model_conf_matrix, unique_conditions, 
+    visualization.conf_matrix(model_cm, unique_conditions, 
                               title, results_outpath, output_file_name)
                               
 
 
+        
 def _svm_decoder(all_modality_concat_bold, all_modality_concat_labels, 
                  subject, region_approach, HRFlag_process, results_outpath, resolution):
     
@@ -172,9 +179,9 @@ def _svm_decoder(all_modality_concat_bold, all_modality_concat_labels,
     
     # confusion matrix
     cm_svm = confusion_matrix(y_test, y_test_pred)
-    model_conf_matrix = cm_svm.astype('float') / cm_svm.sum(axis = 1)[:, np.newaxis]
+    model_cm = cm_svm.astype('float') / cm_svm.sum(axis = 1)[:, np.newaxis]
         
-    visualization.conf_matrix(model_conf_matrix, unique_conditions, 
+    visualization.conf_matrix(model_cm, unique_conditions, 
                               title, results_outpath, output_file_name)
                                                               
                            
@@ -227,9 +234,9 @@ def _grid_mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
         'alpha': [0.05], #[0.0001, 0.05, 0.1]
         'learning_rate': ['constant']} #['constant','adaptive']
     
-    
+    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=0)
     grid = GridSearchCV(MLPClassifier(random_state=0), param_grid, refit=True, 
-                        n_jobs=-1, cv=5, verbose=3) #MLPClassifier(max_iter=300, random_state=0) # cv=10,cv=5
+                        n_jobs=-1, cv=cv, verbose=3) #MLPClassifier(max_iter=300, random_state=0) # cv=10,cv=5
     
     # fitting the model for grid search
     grid.fit(X_train, y_train)
@@ -256,15 +263,14 @@ def _grid_mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
     # Confusion matrix
     cm_ann = confusion_matrix(y_test.values.argmax(axis = 1), grid_predictions.argmax(axis=1))
 #     cm_ann = confusion_matrix(y_test, grid_predictions)
-    model_conf_matrix = cm_ann.astype('float') / cm_ann.sum(axis = 1)[:, np.newaxis]
+    model_cm = cm_ann.astype('float') / cm_ann.sum(axis = 1)[:, np.newaxis]
     
-    visualization.conf_matrix(model_conf_matrix, unique_conditions, 
+    visualization.conf_matrix(model_cm, unique_conditions, 
                               title, results_outpath, output_file_name)
     
     
     
-
-# Best acc=76%
+    
 def _mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,  
                  subject, region_approach, HRFlag_process, results_outpath, 
                  resolution, parcel_no):
@@ -340,17 +346,80 @@ def _mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
 
     # Confusion matrix
     cm_ann = confusion_matrix(y_test.values.argmax(axis = 1), y_test_pred.argmax(axis=1))
-    model_conf_matrix = cm_ann.astype('float') / cm_ann.sum(axis = 1)[:, np.newaxis]
+    model_cm = cm_ann.astype('float') / cm_ann.sum(axis = 1)[:, np.newaxis]
     
-    visualization.conf_matrix(model_conf_matrix, unique_conditions, 
+    visualization.conf_matrix(model_cm, unique_conditions, 
                               title, results_outpath, output_file_name)
 
 
-#####################################################################################
+
+
+def _grid_knn_decoder(all_modality_concat_bold, all_modality_concat_labels, 
+                 subject, region_approach, HRFlag_process, results_outpath, resolution):
+    
+    """
+    k-nearest neighbors classifier with GridSearchCV.
+    """
+
+    title = '{} KNN using {}{}, {} HRFlag'.format(subject, region_approach, 
+                                                  resolution, HRFlag_process) 
+    
+    output_file_name = '{}_KNN_{}{}_{}_HRFlag'.format(subject, region_approach,
+                                                      resolution, HRFlag_process)      
+    
+    X = all_modality_concat_bold
+    y = all_modality_concat_labels
+    
+    categories = np.unique(y)
+    unique_conditions, order = np.unique(categories, return_index=True)
+    unique_conditions = unique_conditions[np.argsort(order)]
+    
+    # Encoding the string to numerical values
+    labelencoder_y = LabelEncoder()
+    y = labelencoder_y.fit_transform(y)
+    y = y.ravel()
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)   
+    
+    # defining parameter range
+    param_grid = {'n_neighbors': [4], # [2,4,8,10,16]
+                  'leaf_size': [1], # [1,10,20,30]
+                  'p': [1], # [1,2]
+                  'weights' : ['distance'], # ['uniform','distance']
+                  'metric' : ['minkowski'], # ['minkowski','euclidean','manhattan']
+                  'algorithm': ['auto']} # ['auto','kd_tree']
+    
+    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=0)
+    grid = GridSearchCV(KNeighborsClassifier(), param_grid, refit=True, 
+                        n_jobs=-1, cv=cv, verbose=3)
+    
+    # fitting the model for grid search
+    grid.fit(X_train, y_train)
+    
+    # print best parameter after tuning
+    print(colored(('Best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
+ 
+    # print how our model looks after hyper-parameter tuning
+    print('Best parameters found:\n', grid.best_estimator_)
+    
+    grid_predictions = grid.predict(X_test)
+
+    # print classification report
+    print(classification_report(y_test, grid_predictions))
+    
+    # confusion matrix
+    cm_knn = confusion_matrix(y_test, grid_predictions)
+    model_cm = cm_knn.astype('float') / cm_knn.sum(axis=1)[:, np.newaxis]
+        
+    visualization.conf_matrix(model_cm, unique_conditions, 
+                              title, results_outpath, output_file_name)
+
+
 
     
 def _knn_decoder(all_modality_concat_bold, all_modality_concat_labels,
-                 subject, region_approach, HRFlag_process, results_outpath, resolution):
+                 subject, region_approach, HRFlag_process, results_outpath, resolution): 
+    
             
     """
     k-nearest neighbors classifier. (k=8)
@@ -394,18 +463,81 @@ def _knn_decoder(all_modality_concat_bold, all_modality_concat_labels,
     print('mean accuracy:%.4f' % np.mean(scores))
 
     # confusion matrix
-    cm_knn = confusion_matrix(y_test, y_pred)
-    model_conf_matrix = cm_knn.astype('float') / cm_knn.sum(axis=1)[:, np.newaxis] 
+#    cm_knn = confusion_matrix(y_test, y_pred) #Apr10
+    cm_knn = confusion_matrix(y_test, y_test_pred)
+    model_cm = cm_knn.astype('float') / cm_knn.sum(axis=1)[:, np.newaxis] 
     
-    visualization.conf_matrix(model_conf_matrix, 
-                              unique_conditions, 
-                              title, 
-                              results_outpath, 
-                              output_file_name)
-    
-        
+    visualization.conf_matrix(model_cm, unique_conditions, 
+                              title, results_outpath, output_file_name)
 
+    
+    
+
+def _grid_random_forest_decoder(all_modality_concat_bold, all_modality_concat_labels, subject, 
+                                region_approach, HRFlag_process, results_outpath, resolution):
+    
+    """
+    Random Forest classifier with GridSearchCV.
+    """
+
+    title = '{} Random Forest using {}{}, {} HRFlag'.format(subject, region_approach, 
+                                                  resolution, HRFlag_process) 
+    
+    output_file_name = '{}_RandomForest_{}{}_{}_HRFlag'.format(subject, region_approach,
+                                                      resolution, HRFlag_process)      
+    
+    X = all_modality_concat_bold
+    y = all_modality_concat_labels
+    
+    categories = np.unique(y)
+    unique_conditions, order = np.unique(categories, return_index=True)
+    unique_conditions = unique_conditions[np.argsort(order)]
+    
+    # Encoding the string to numerical values
+    labelencoder_y = LabelEncoder()
+    y = labelencoder_y.fit_transform(y)
+    y = y.ravel()
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)   
+    
+    # defining parameter range
+    param_grid = {#'n_estimators': [10,50,200],
+                  'n_estimators': [200], #[int(x) for x in np.linspace(100,1000,num = 10)], or 200?
+                  'max_features': [21], #[2,5,10,21,25,50,'auto','sqrt']
+                  'max_depth': [20],#[10,20,50, None]
+                  'min_samples_split': [2], #[1,2,5,8]
+                  'min_samples_leaf': [1],#[1,2,4,8]
+                  'bootstrap': [False]#[True, False]
+                  }
+    
+    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=0)
+    grid = GridSearchCV(RandomForestClassifier(), param_grid, refit=True, 
+                        n_jobs=-1, cv=cv, verbose=3)
+    
+    # fitting the model for grid search
+    grid.fit(X_train, y_train)
+    
+    # print best parameter after tuning
+    print(colored(('Best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
+ 
+    # print how our model looks after hyper-parameter tuning
+    print('Best parameters found:\n', grid.best_estimator_)
+    
+    grid_predictions = grid.predict(X_test)
+
+    # print classification report
+    print(classification_report(y_test, grid_predictions))
+    
+    # confusion matrix
+    cm_rf = confusion_matrix(y_test, grid_predictions)
+    model_cm = cm_rf.astype('float') / cm_rf.sum(axis=1)[:, np.newaxis]
         
+    visualization.conf_matrix(model_cm, unique_conditions, 
+                              title, results_outpath, output_file_name)
+
+
+
+
 def _random_forest_decoder(all_modality_concat_bold, all_modality_concat_labels,
                            subject, region_approach, HRFlag_process, results_outpath, resolution):
 
@@ -448,17 +580,17 @@ def _random_forest_decoder(all_modality_concat_bold, all_modality_concat_labels,
 
     # confusion matrix
     cm_rfc = confusion_matrix(y_test, y_pred)
-    model_conf_matrix = cm_rfc.astype('float') / cm_rfc.sum(axis=1)[:, np.newaxis] 
+    model_cm = cm_rfc.astype('float') / cm_rfc.sum(axis=1)[:, np.newaxis] 
               
         
-#     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.1, random_state = 0)
+#     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.1, random_state=0)
     
 #     scaler = StandardScaler()
 #     X_train = scaler.fit_transform(X_train)
 #     X_test = scaler.transform(X_test)
     
 #     # Initializing
-#     model_rfc = RandomForestClassifier(max_depth=2, random_state = 0)
+#     model_rfc = RandomForestClassifier(max_depth=2, random_state=0)
 #     model_rfc.fit(X_train, y_train)      
 
 #     # classification report
@@ -479,20 +611,269 @@ def _random_forest_decoder(all_modality_concat_bold, all_modality_concat_labels,
     
 #     # Confusion matrix
 #     cm_rfc = confusion_matrix(y_test, rfc)
-#     model_conf_matrix = cm_rfc.astype('float') / cm_rfc.sum(axis = 1)[:, np.newaxis]
+#     model_cm = cm_rfc.astype('float') / cm_rfc.sum(axis = 1)[:, np.newaxis]
     
-    visualization.conf_matrix(model_conf_matrix, 
-                              unique_conditions, 
-                              title, 
-                              results_outpath, 
-                              output_file_name)    
+    visualization.conf_matrix(model_cm, unique_conditions, 
+                              title, results_outpath, output_file_name)    
     
+
+
     
+def _grid_logistic_regression_decoder(all_modality_concat_bold, all_modality_concat_labels,
+                                      subject, region_approach, HRFlag_process,   
+                                      results_outpath, resolution):
+    
+    """
+    Logistic Regression classifier with GridSearchCV.
+    """
+
+    title = '{} Logistic Regression using {}{}, {} HRFlag'.format(subject, region_approach, 
+                                                                  resolution, HRFlag_process) 
+    
+    output_file_name = '{}_LogisticRegression_{}{}_{}_HRFlag'.format(subject, region_approach,
+                                                                     resolution, HRFlag_process)      
+    
+    X = all_modality_concat_bold
+    y = all_modality_concat_labels
+    
+    categories = np.unique(y)
+    unique_conditions, order = np.unique(categories, return_index=True)
+    unique_conditions = unique_conditions[np.argsort(order)]
+    
+    # Encoding the string to numerical values
+    labelencoder_y = LabelEncoder()
+    y = labelencoder_y.fit_transform(y)
+    y = y.ravel()
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state=0)   
+    
+    # defining parameter range
+    param_grid = {'solver': ['liblinear'], # ['newton-cg','lbfgs','liblinear','sag','saga']
+                  'penalty': ['l1'], # ['none','l1','l2','elasticnet']
+                  'C': [0.1], # [100,10,1.0,0.1,0.01]
+                  'max_iter': [20], #[10,20,21,50,100,1000]
+                  'class_weight': [None] #['balanced', None]
+                  }
+    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=0)
+    grid = GridSearchCV(LogisticRegression(), param_grid, refit=True, 
+                        n_jobs=-1, cv=cv, verbose=3)
+    
+    # fitting the model for grid search
+    grid.fit(X_train, y_train)
+    
+    # print best parameter after tuning
+    print(colored(('Best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
+ 
+    # print how our model looks after hyper-parameter tuning
+    print('Best parameters found:\n', grid.best_estimator_)
+    
+    grid_predictions = grid.predict(X_test)
+
+    # print classification report
+    print(classification_report(y_test, grid_predictions))
+    
+    # confusion matrix
+    cm_lr = confusion_matrix(y_test, grid_predictions)
+    model_cm = cm_lr.astype('float') / cm_lr.sum(axis=1)[:, np.newaxis]
         
+    visualization.conf_matrix(model_cm, unique_conditions, 
+                              title, results_outpath, output_file_name)
+    
+    
+
+    
+def _grid_ridge_decoder(all_modality_concat_bold, all_modality_concat_labels,
+                                      subject, region_approach, HRFlag_process,   
+                                      results_outpath, resolution):
+    
+    """
+    Ridge Regression classifier with GridSearchCV.
+    """
+
+    title = '{} Ridge Regression using {}{}, {} HRFlag'.format(subject, region_approach, 
+                                                                  resolution, HRFlag_process) 
+    
+    output_file_name = '{}_RidgeRegression_{}{}_{}_HRFlag'.format(subject, region_approach,
+                                                                     resolution, HRFlag_process)      
+    
+    X = all_modality_concat_bold
+    y = all_modality_concat_labels
+    
+    categories = np.unique(y)
+    unique_conditions, order = np.unique(categories, return_index=True)
+    unique_conditions = unique_conditions[np.argsort(order)]
+    
+    # Encoding the string to numerical values
+    labelencoder_y = LabelEncoder()
+    y = labelencoder_y.fit_transform(y)
+    y = y.ravel()
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)   
+    
+    # defining parameter range
+    param_grid = {'alpha': [0.1], # [0, 0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+                  'normalize': [True], # [True, False]
+                  'solver': ['lsqr'] # ['auto','svd','cholesky','lsqr','sparse_cg','sag','saga','lbfgs']
+                  }
+    
+    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=0)
+    grid = GridSearchCV(RidgeClassifier(random_state=0), param_grid, refit=True, 
+                        n_jobs=-1, cv=cv, verbose=3)
+    
+    # fitting the model for grid search
+    grid.fit(X_train, y_train)
+    
+    # print best parameter after tuning
+    print(colored(('Best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
+ 
+    # print how our model looks after hyper-parameter tuning
+    print('Best parameters found:\n', grid.best_estimator_)
+    
+    grid_predictions = grid.predict(X_test)
+
+    # print classification report
+    print(classification_report(y_test, grid_predictions))
+    
+    # confusion matrix
+    cm_ridge = confusion_matrix(y_test, grid_predictions)
+    model_cm = cm_ridge.astype('float') / cm_ridge.sum(axis=1)[:, np.newaxis]
+        
+    visualization.conf_matrix(model_cm, unique_conditions, 
+                              title, results_outpath, output_file_name) 
+    
+    
+
+    
+def _grid_bagging_decoder(all_modality_concat_bold, all_modality_concat_labels,
+                                      subject, region_approach, HRFlag_process,   
+                                      results_outpath, resolution):
+    
+    """
+    Bagged Decision Trees (Bagging) classifier with GridSearchCV.
+    """
+
+    title = '{} Bagging using {}{}, {} HRFlag'.format(subject, region_approach, 
+                                                      resolution, HRFlag_process) 
+    
+    output_file_name = '{}_Bagging_{}{}_{}_HRFlag'.format(subject, region_approach,
+                                                          resolution, HRFlag_process)      
+    
+    X = all_modality_concat_bold
+    y = all_modality_concat_labels
+    
+    categories = np.unique(y)
+    unique_conditions, order = np.unique(categories, return_index=True)
+    unique_conditions = unique_conditions[np.argsort(order)]
+    
+    # Encoding the string to numerical values
+    labelencoder_y = LabelEncoder()
+    y = labelencoder_y.fit_transform(y)
+    y = y.ravel()
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)   
+    
+    # defining parameter range
+    param_grid = {'n_estimators': [1000], #[10,100,200,800,1000,2000]
+                  'bootstrap': [False],#[True, False]
+                  'max_features': [100], #[2,5,10,21,25,50,100,500,'auto','sqrt']
+                  'bootstrap_features': [False],
+                  'oob_score': [False],#[False, 1,2,4,8,10]
+                  'warm_start': [True]#[True, False]
+                 }
+    
+    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=0)
+    grid = GridSearchCV(BaggingClassifier(random_state=0), param_grid, refit=True, 
+                        n_jobs=-1, cv=cv, verbose=3)
+    
+    # fitting the model for grid search
+    grid.fit(X_train, y_train)
+    
+    # print best parameter after tuning
+    print(colored(('Best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
+ 
+    # print how our model looks after hyper-parameter tuning
+    print('Best parameters found:\n', grid.best_estimator_)
+    
+    grid_predictions = grid.predict(X_test)
+
+    # print classification report
+    print(classification_report(y_test, grid_predictions))
+    
+    # confusion matrix
+    cm_bagging = confusion_matrix(y_test, grid_predictions)
+    model_cm = cm_bagging.astype('float') / cm_bagging.sum(axis=1)[:, np.newaxis]
+        
+    visualization.conf_matrix(model_cm, unique_conditions, 
+                              title, results_outpath, output_file_name) 
+
+
+    
+            
+def _grid_gaussian_nb_decoder(all_modality_concat_bold, all_modality_concat_labels,
+                               subject, region_approach, HRFlag_process,   
+                               results_outpath, resolution):    
+    
+    """
+    Gaussian Naive Bayes classifier with GridSearchCV.
+    """
+
+    title = '{} Gaussian Naive Bayes using {}{}, {} HRFlag'.format(subject, region_approach, 
+                                                                    resolution, HRFlag_process) 
+    
+    output_file_name = '{}_GaussianNB_{}{}_{}_HRFlag'.format(subject, region_approach,
+                                                          resolution, HRFlag_process)      
+    
+    X = all_modality_concat_bold
+    y = all_modality_concat_labels
+    
+    categories = np.unique(y)
+    unique_conditions, order = np.unique(categories, return_index=True)
+    unique_conditions = unique_conditions[np.argsort(order)]
+    
+    # Encoding the string to numerical values
+    labelencoder_y = LabelEncoder()
+    y = labelencoder_y.fit_transform(y)
+    y = y.ravel()
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)   
+    
+    # defining parameter range
+    param_grid = {'var_smoothing': np.logspace(-3,-5, num=3) #np.logspace(0,-14, num=15)
+#                   'priors': [None]
+                 }
+    
+    
+    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=0)
+    
+    t0 = time()
+    grid = GridSearchCV(GaussianNB(), param_grid, refit=True, 
+                        n_jobs=-1, cv=cv, verbose=3)
+    grid.fit(X_train, y_train)
+    
+    # print how our model looks after hyper-parameter tuning
+    print("Decoding time:", round(time()-t0, 3), "s")
+    print(colored(('Model best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
+    print(colored(('Model best score found:\n'),'red',attrs=['bold']),grid.best_score_)
+    print('Model best estimation is:\n', grid.best_estimator_)
+
+    # classification report
+    grid_predictions = grid.predict(X_test)
+    print(classification_report(y_test, grid_predictions))
+    
+    # confusion matrix
+    cm_nb = confusion_matrix(y_test, grid_predictions)
+    model_cm = cm_nb.astype('float') / cm_nb.sum(axis=1)[:, np.newaxis]
+        
+    visualization.conf_matrix(model_cm, unique_conditions, 
+                              title, results_outpath, output_file_name) 
+    
+
+    
+
 def postproc_benchmark_decoder(subject, modalities, decoders, region_approach, 
                                HRFlag_process, resolution): 
     
-    home_dir = '/home/SRastegarnia/hcptrt_decoding_Shima/'
+    home_dir = '/home/srastegarnia/hcptrt_decoding_Shima/'
     proc_data_path = home_dir + 'data/'
     results_outpath = home_dir + 'benchmark_models/' \
                      'results/{}_{}/{}/{}/'.format(region_approach,
@@ -515,15 +896,14 @@ def postproc_benchmark_decoder(subject, modalities, decoders, region_approach,
                                                                                         resolution)
     
     # getting the number of parcels, useful for soft parcellatin approaches like dypac        
-    df_path = proc_data_path + '/medial_data/fMRI2/{}/{}/{}/{}_wm_fMRI2.npy'. format(region_approach, 
+    df_path = proc_data_path + 'medial_data/fMRI2/{}/{}/{}/{}_wm_fMRI2.npy'. format(region_approach, 
                                                                                      resolution, 
                                                                                      subject, subject) 
     df = np.load(df_path)
+#     print(df)
     parcel_no = int(len(df[0][:][1]))
-    
-    print('Generating concatenated bold and labels files is done, for',
-          subject,'with',HRFlag_process,'HRFlag method,','\n',
-          'and',region_approach,resolution,'parcelation approach.','\n')                
+    print(parcel_no)
+                 
     print('all_modality_concat_bold shape', np.shape(all_modality_concat_bold))
     print('all_modality_concat_labels shape', np.shape(all_modality_concat_labels),'\n')
     
@@ -595,8 +975,75 @@ def postproc_benchmark_decoder(subject, modalities, decoders, region_approach,
                               HRFlag_process = HRFlag_process,
                               results_outpath = results_outpath,
                               resolution = resolution,
-                              parcel_no = parcel_no) 
+                              parcel_no = parcel_no)        
+            
+            
+        elif decoder == 'grid_knn': 
+            print(colored(('K-Nearest Neighbor classifier with grid search'), attrs=['bold']))
+            _grid_knn_decoder(all_modality_concat_bold = all_modality_concat_bold, 
+                              all_modality_concat_labels = all_modality_concat_labels,
+                              subject = subject, 
+                              region_approach = region_approach, 
+                              HRFlag_process = HRFlag_process,
+                              results_outpath = results_outpath,
+                              resolution = resolution) 
 
+            
+        elif decoder == 'grid_random_forest': 
+            print(colored(('Random Forest classifier with grid search'), attrs=['bold']))
+            _grid_random_forest_decoder(all_modality_concat_bold = all_modality_concat_bold, 
+                                        all_modality_concat_labels = all_modality_concat_labels,
+                                        subject = subject, 
+                                        region_approach = region_approach, 
+                                        HRFlag_process = HRFlag_process,
+                                        results_outpath = results_outpath,
+                                        resolution = resolution)
+            
+            
+        elif decoder == 'grid_logistic_regression': 
+            print(colored(('Logistic Regression classifier with grid search'), attrs=['bold']))
+            _grid_logistic_regression_decoder(all_modality_concat_bold = all_modality_concat_bold, 
+                                              all_modality_concat_labels = all_modality_concat_labels,
+                                              subject = subject, 
+                                              region_approach = region_approach, 
+                                              HRFlag_process = HRFlag_process,
+                                              results_outpath = results_outpath,
+                                              resolution = resolution)
+            
+            
+        elif decoder == 'grid_ridge': 
+            print(colored(('Ridge Regression classifier with grid search'), attrs=['bold']))
+            _grid_ridge_decoder(all_modality_concat_bold = all_modality_concat_bold, 
+                                all_modality_concat_labels = all_modality_concat_labels,
+                                subject = subject, 
+                                region_approach = region_approach, 
+                                HRFlag_process = HRFlag_process,
+                                results_outpath = results_outpath,
+                                resolution = resolution)
+            
+            
+        elif decoder == 'grid_bagging': 
+            print(colored(('Bagged Decision Trees classifier with grid search'), attrs=['bold']))
+            _grid_bagging_decoder(all_modality_concat_bold = all_modality_concat_bold, 
+                                  all_modality_concat_labels = all_modality_concat_labels,
+                                  subject = subject, 
+                                  region_approach = region_approach, 
+                                  HRFlag_process = HRFlag_process,
+                                  results_outpath = results_outpath,
+                                  resolution = resolution)
+            
+            
+        elif decoder == 'grid_gaussian_nb': 
+            print(colored(('Gaussian Naive Bayes classifier with grid search'), attrs=['bold']))
+            _grid_gaussian_nb_decoder(all_modality_concat_bold = all_modality_concat_bold, 
+                                       all_modality_concat_labels = all_modality_concat_labels,
+                                       subject = subject, 
+                                       region_approach = region_approach, 
+                                       HRFlag_process = HRFlag_process,
+                                       results_outpath = results_outpath,
+                                       resolution = resolution)
+            
+                                    
         else:
             print('The model is not defined')
                         
