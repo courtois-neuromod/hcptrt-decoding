@@ -7,7 +7,6 @@ import warnings
 import math
 from time import time
 import matplotlib.pyplot as plt
-#from nilearn.input_data import NiftiMasker
 from nilearn.maskers import NiftiLabelsMasker, NiftiMasker, NiftiMapsMasker
 from nilearn.plotting import plot_matrix
 from sklearn.preprocessing import StandardScaler, LabelEncoder, OneHotEncoder
@@ -25,7 +24,6 @@ from keras.layers import Dense
 from termcolor import colored
 import random
 np.random.seed(0)
-# import tensorflow as tf
 
 # sys.path.append(os.path.join(".."))
 import visualization
@@ -111,31 +109,28 @@ def _grid_svm_decoder(all_modality_concat_bold, all_modality_concat_labels,
                   'kernel': ['rbf']} # ['rbf', 'linear']
     
     cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=0)
-    grid = GridSearchCV(SVC(random_state=0), param_grid, refit=True, 
-                        n_jobs=-1, cv=cv, verbose=3) #SVC(max_iter=300, random_state=0)
     
-    # fitting the model for grid search
+    t0 = time()
+    grid = GridSearchCV(SVC(random_state=0), param_grid, refit=True, 
+                        n_jobs=-1, cv=cv, verbose=3)
+
     grid.fit(X_train, y_train)
     
-    # print best parameter after tuning
-    print(colored(('Best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
- 
-    # print how our model looks after hyper-parameter tuning
-    print('Best parameters found:\n', grid.best_estimator_)
+    # how our model looks after hyper-parameter tuning
+    print(colored(('Model best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
     
+    # classification report
     grid_predictions = grid.predict(X_test)
-
-    # print classification report
     print(classification_report(y_test, grid_predictions))
+    print("SVM decoding time:", round(time()-t0, 3), "s")
     
     # confusion matrix
-    cm_svm = confusion_matrix(y_test, grid_predictions)
-    model_cm = cm_svm.astype('float') / cm_svm.sum(axis=1)[:, np.newaxis]
-        
+    cm_svm = confusion_matrix(y_test, grid_predictions) #,normalize='true'
+    model_cm = np.round(cm_svm.astype('float') / cm_svm.sum(axis=1)[:, np.newaxis], 2)
+    
     visualization.conf_matrix(model_cm, unique_conditions, 
                               title, results_outpath, output_file_name)
                               
-
 
         
 def _svm_decoder(all_modality_concat_bold, all_modality_concat_labels, 
@@ -189,7 +184,7 @@ def _svm_decoder(all_modality_concat_bold, all_modality_concat_labels,
     
 def _grid_mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,  
                       subject, region_approach, HRFlag_process, results_outpath, 
-                      resolution, parcel_no):
+                      resolution):
     
     """
     Multi Layer Perceptron Neural Networks Decoder, with two dense layers,  
@@ -273,7 +268,7 @@ def _grid_mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
     
 def _mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,  
                  subject, region_approach, HRFlag_process, results_outpath, 
-                 resolution, parcel_no):
+                 resolution):
     
     """
     Multi Layer Perceptron Neural Networks 
@@ -312,22 +307,20 @@ def _mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
         
     # Initializing
     warnings.filterwarnings('ignore')
+    
+    t0 = time()
     model_mlp = Sequential()
      
-    model_mlp.add(Dense(int(resolution/(math.pow(2,1))) , input_dim=parcel_no,
+    model_mlp.add(Dense(int(resolution/(math.pow(2,1))) , input_dim=resolution,
                         kernel_initializer='uniform', activation='relu', use_bias=True,
                         bias_initializer='zeros'))
 
     model_mlp.add(Dense(int(resolution/(math.pow(2,2))), kernel_initializer='uniform',
                         activation='relu',use_bias=True, bias_initializer='zeros'))
 
-#     model_mlp.add(Dense(int(resolution/(math.pow(2,3))), kernel_initializer="uniform",
-#                        activation='relu'))
-
     model_mlp.add(Dense(num_cond, activation='softmax'))
 
-    summary = model_mlp.summary()
-    # sparse_categorical_crossentropy , 'categorical_crossentropy'       
+    summary = model_mlp.summary()     
     model_mlp.compile(optimizer='adamax', loss='categorical_crossentropy', metrics=['accuracy'])        
     history = model_mlp.fit(X_train, y_train, batch_size=10, epochs=15, validation_split=0.1) 
     
@@ -336,23 +329,25 @@ def _mlp_decoder(all_modality_concat_bold, all_modality_concat_labels,
     
     # Making the predictions and evaluating the model
     y_test_pred = model_mlp.predict(X_test)
-#     y_test_pred = (y_pred > 0.5)
+    
     print(classification_report(y_test.values.argmax(axis=1), y_test_pred.argmax(axis=1)))
     
     print ('mean accuracy score:', np.round(accuracy_score(y_test.values.argmax(axis = 1), 
                                                            y_test_pred.argmax(axis=1), 
                                                            normalize = True, 
                                                            sample_weight=None),2))
+    
+    print("MLP decoding time:", round(time()-t0, 3), "s")
 
     # Confusion matrix
     cm_ann = confusion_matrix(y_test.values.argmax(axis = 1), y_test_pred.argmax(axis=1))
-    model_cm = cm_ann.astype('float') / cm_ann.sum(axis = 1)[:, np.newaxis]
+    model_cm = np.round(cm_ann.astype('float') / cm_ann.sum(axis = 1)[:, np.newaxis], 2) 
     
     visualization.conf_matrix(model_cm, unique_conditions, 
                               title, results_outpath, output_file_name)
 
 
-
+     
 
 def _grid_knn_decoder(all_modality_concat_bold, all_modality_concat_labels, 
                  subject, region_approach, HRFlag_process, results_outpath, resolution):
@@ -390,32 +385,30 @@ def _grid_knn_decoder(all_modality_concat_bold, all_modality_concat_labels,
                   'algorithm': ['auto']} # ['auto','kd_tree']
     
     cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=0)
+    
+    t0 = time()
     grid = GridSearchCV(KNeighborsClassifier(), param_grid, refit=True, 
                         n_jobs=-1, cv=cv, verbose=3)
-    
-    # fitting the model for grid search
+
     grid.fit(X_train, y_train)
     
-    # print best parameter after tuning
-    print(colored(('Best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
- 
-    # print how our model looks after hyper-parameter tuning
-    print('Best parameters found:\n', grid.best_estimator_)
+    # how our model looks after hyper-parameter tuning
+    print(colored(('Model best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
     
+    # classification report
     grid_predictions = grid.predict(X_test)
-
-    # print classification report
     print(classification_report(y_test, grid_predictions))
+    print("KNN decoding time:", round(time()-t0, 3), "s")
     
     # confusion matrix
     cm_knn = confusion_matrix(y_test, grid_predictions)
-    model_cm = cm_knn.astype('float') / cm_knn.sum(axis=1)[:, np.newaxis]
+    model_cm = np.round(cm_knn.astype('float') / cm_knn.sum(axis=1)[:, np.newaxis], 2) 
         
     visualization.conf_matrix(model_cm, unique_conditions, 
                               title, results_outpath, output_file_name)
 
 
-
+         
     
 def _knn_decoder(all_modality_concat_bold, all_modality_concat_labels,
                  subject, region_approach, HRFlag_process, results_outpath, resolution): 
@@ -465,12 +458,12 @@ def _knn_decoder(all_modality_concat_bold, all_modality_concat_labels,
     # confusion matrix
 #    cm_knn = confusion_matrix(y_test, y_pred) #Apr10
     cm_knn = confusion_matrix(y_test, y_test_pred)
-    model_cm = cm_knn.astype('float') / cm_knn.sum(axis=1)[:, np.newaxis] 
+    model_cm = np.round(cm_knn.astype('float') / cm_knn.sum(axis=1)[:, np.newaxis], 2)  
     
     visualization.conf_matrix(model_cm, unique_conditions, 
                               title, results_outpath, output_file_name)
 
-    
+
     
 
 def _grid_random_forest_decoder(all_modality_concat_bold, all_modality_concat_labels, subject, 
@@ -511,33 +504,31 @@ def _grid_random_forest_decoder(all_modality_concat_bold, all_modality_concat_la
                   }
     
     cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=0)
+    
+    t0 = time()
     grid = GridSearchCV(RandomForestClassifier(), param_grid, refit=True, 
                         n_jobs=-1, cv=cv, verbose=3)
-    
-    # fitting the model for grid search
+
     grid.fit(X_train, y_train)
     
-    # print best parameter after tuning
-    print(colored(('Best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
- 
-    # print how our model looks after hyper-parameter tuning
-    print('Best parameters found:\n', grid.best_estimator_)
+    # how our model looks after hyper-parameter tuning
+    print(colored(('Model best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
     
+    # classification report
     grid_predictions = grid.predict(X_test)
-
-    # print classification report
     print(classification_report(y_test, grid_predictions))
+    print("RandomForest decoding time:", round(time()-t0, 3), "s")
     
     # confusion matrix
     cm_rf = confusion_matrix(y_test, grid_predictions)
-    model_cm = cm_rf.astype('float') / cm_rf.sum(axis=1)[:, np.newaxis]
+    model_cm = np.round(cm_rf.astype('float') / cm_rf.sum(axis=1)[:, np.newaxis], 2)
         
     visualization.conf_matrix(model_cm, unique_conditions, 
                               title, results_outpath, output_file_name)
 
 
 
-
+    
 def _random_forest_decoder(all_modality_concat_bold, all_modality_concat_labels,
                            subject, region_approach, HRFlag_process, results_outpath, resolution):
 
@@ -655,32 +646,31 @@ def _grid_logistic_regression_decoder(all_modality_concat_bold, all_modality_con
                   'class_weight': [None] #['balanced', None]
                   }
     cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=0)
+    
+    t0 = time()
     grid = GridSearchCV(LogisticRegression(), param_grid, refit=True, 
                         n_jobs=-1, cv=cv, verbose=3)
     
-    # fitting the model for grid search
     grid.fit(X_train, y_train)
     
     # print best parameter after tuning
-    print(colored(('Best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
+    print(colored(('Model best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
  
-    # print how our model looks after hyper-parameter tuning
-    print('Best parameters found:\n', grid.best_estimator_)
-    
+    # classification report
     grid_predictions = grid.predict(X_test)
-
-    # print classification report
     print(classification_report(y_test, grid_predictions))
+    print("Logistic regression decoding time:", round(time()-t0, 3), "s")
     
     # confusion matrix
     cm_lr = confusion_matrix(y_test, grid_predictions)
-    model_cm = cm_lr.astype('float') / cm_lr.sum(axis=1)[:, np.newaxis]
+    model_cm = np.round(cm_lr.astype('float') / cm_lr.sum(axis=1)[:, np.newaxis], 2)
         
     visualization.conf_matrix(model_cm, unique_conditions, 
                               title, results_outpath, output_file_name)
-    
-    
 
+    
+    
+    
     
 def _grid_ridge_decoder(all_modality_concat_bold, all_modality_concat_labels,
                                       subject, region_approach, HRFlag_process,   
@@ -717,32 +707,30 @@ def _grid_ridge_decoder(all_modality_concat_bold, all_modality_concat_labels,
                   }
     
     cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=0)
+    
+    t0 = time()
     grid = GridSearchCV(RidgeClassifier(random_state=0), param_grid, refit=True, 
                         n_jobs=-1, cv=cv, verbose=3)
-    
-    # fitting the model for grid search
+
     grid.fit(X_train, y_train)
     
-    # print best parameter after tuning
-    print(colored(('Best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
+    # how our model looks after hyper-parameter tuning
+    print(colored(('Model best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
  
-    # print how our model looks after hyper-parameter tuning
-    print('Best parameters found:\n', grid.best_estimator_)
-    
+    # classification report
     grid_predictions = grid.predict(X_test)
-
-    # print classification report
     print(classification_report(y_test, grid_predictions))
+    print("Ridge decoding time:", round(time()-t0, 3), "s")
     
     # confusion matrix
     cm_ridge = confusion_matrix(y_test, grid_predictions)
-    model_cm = cm_ridge.astype('float') / cm_ridge.sum(axis=1)[:, np.newaxis]
+    model_cm = np.round(cm_ridge.astype('float') / cm_ridge.sum(axis=1)[:, np.newaxis], 2)
         
     visualization.conf_matrix(model_cm, unique_conditions, 
                               title, results_outpath, output_file_name) 
     
     
-
+    
     
 def _grid_bagging_decoder(all_modality_concat_bold, all_modality_concat_labels,
                                       subject, region_approach, HRFlag_process,   
@@ -782,31 +770,30 @@ def _grid_bagging_decoder(all_modality_concat_bold, all_modality_concat_labels,
                  }
     
     cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=0)
+    
+    t0 = time()
     grid = GridSearchCV(BaggingClassifier(random_state=0), param_grid, refit=True, 
                         n_jobs=-1, cv=cv, verbose=3)
-    
-    # fitting the model for grid search
+
     grid.fit(X_train, y_train)
     
-    # print best parameter after tuning
-    print(colored(('Best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
+    # how our model looks after hyper-parameter tuning
+    print(colored(('Model best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
  
-    # print how our model looks after hyper-parameter tuning
-    print('Best parameters found:\n', grid.best_estimator_)
-    
+    # classification report
     grid_predictions = grid.predict(X_test)
-
-    # print classification report
     print(classification_report(y_test, grid_predictions))
+    print("Bagging decoding time:", round(time()-t0, 3), "s")
     
     # confusion matrix
     cm_bagging = confusion_matrix(y_test, grid_predictions)
-    model_cm = cm_bagging.astype('float') / cm_bagging.sum(axis=1)[:, np.newaxis]
+    model_cm = np.round(cm_bagging.astype('float') / cm_bagging.sum(axis=1)[:, np.newaxis], 2)
         
     visualization.conf_matrix(model_cm, unique_conditions, 
                               title, results_outpath, output_file_name) 
 
 
+    
     
             
 def _grid_gaussian_nb_decoder(all_modality_concat_bold, all_modality_concat_labels,
@@ -848,204 +835,204 @@ def _grid_gaussian_nb_decoder(all_modality_concat_bold, all_modality_concat_labe
     t0 = time()
     grid = GridSearchCV(GaussianNB(), param_grid, refit=True, 
                         n_jobs=-1, cv=cv, verbose=3)
+    
     grid.fit(X_train, y_train)
     
     # print how our model looks after hyper-parameter tuning
-    print("Decoding time:", round(time()-t0, 3), "s")
     print(colored(('Model best parameters found:\n'),'red',attrs=['bold']),grid.best_params_)
-    print(colored(('Model best score found:\n'),'red',attrs=['bold']),grid.best_score_)
-    print('Model best estimation is:\n', grid.best_estimator_)
-
+    
     # classification report
     grid_predictions = grid.predict(X_test)
     print(classification_report(y_test, grid_predictions))
+    print("GaussianNB decoding time:", round(time()-t0, 3), "s")
     
     # confusion matrix
     cm_nb = confusion_matrix(y_test, grid_predictions)
-    model_cm = cm_nb.astype('float') / cm_nb.sum(axis=1)[:, np.newaxis]
+    model_cm = np.round(cm_nb.astype('float') / cm_nb.sum(axis=1)[:, np.newaxis], 2) 
         
     visualization.conf_matrix(model_cm, unique_conditions, 
                               title, results_outpath, output_file_name) 
+        
+    
     
 
-    
-
-def postproc_benchmark_decoder(subject, modalities, decoders, region_approach, 
+def postproc_benchmark_decoder(subjects, modalities, decoders, region_approach, 
                                HRFlag_process, resolution): 
     
     home_dir = '/home/srastegarnia/hcptrt_decoding_Shima/'
     proc_data_path = home_dir + 'data/'
-    results_outpath = home_dir + 'benchmark_models/' \
-                     'results/{}_{}/{}/{}/'.format(region_approach,
-                                                resolution, subject, 
-                                                HRFlag_process)
-
-    if not os.path.exists(results_outpath):
-        os.makedirs(results_outpath)
-
-    print('\n')
-    print(colored((subject, region_approach, resolution, HRFlag_process),
-                  'red',attrs=['bold']))
-    print('------------------------------------------------------------------------------------------------')
-
-    all_modality_concat_bold, all_modality_concat_labels = _generate_all_modality_files(subject, 
-                                                                                        modalities,
-                                                                                        region_approach,
-                                                                                        HRFlag_process,
-                                                                                        proc_data_path,
-                                                                                        resolution)
     
-    # getting the number of parcels, useful for soft parcellatin approaches like dypac        
-    df_path = proc_data_path + 'medial_data/fMRI2/{}/{}/{}/{}_wm_fMRI2.npy'. format(region_approach, 
-                                                                                     resolution, 
-                                                                                     subject, subject) 
-    df = np.load(df_path)
-#     print(df)
-    parcel_no = int(len(df[0][:][1]))
-    print(parcel_no)
-                 
-    print('all_modality_concat_bold shape', np.shape(all_modality_concat_bold))
-    print('all_modality_concat_labels shape', np.shape(all_modality_concat_labels),'\n')
-    
+    for subject in subjects:
+        
+        results_outpath = home_dir + 'hcptrt-decoding/results/' \
+                         '{}_{}/{}/{}/'.format(region_approach,
+                                               resolution, subject, 
+                                               HRFlag_process)
 
-    for decoder in decoders:
+        if not os.path.exists(results_outpath):
+            os.makedirs(results_outpath)
 
-        if decoder == 'svm':
-            print(colored(('Support Vector Machine classifier:'),attrs=['bold']))
-            _svm_decoder(all_modality_concat_bold = all_modality_concat_bold, 
-                         all_modality_concat_labels = all_modality_concat_labels,
-                         subject = subject, 
-                         region_approach = region_approach, 
-                         HRFlag_process = HRFlag_process, 
-                         results_outpath = results_outpath,
-                         resolution = resolution)
-            
+        print('\n')
+        print(colored((subject, region_approach, resolution, HRFlag_process),
+                      'red',attrs=['bold']))
+        print('------------------------------------------------------------------------------------------------')
 
-        elif decoder == 'mlp': 
-            print(colored(('Multi Layer Perceptron Neural Networks classifier'\
-                           '(two dense layers):'), attrs=['bold']))
-            _mlp_decoder(all_modality_concat_bold = all_modality_concat_bold, 
-                         all_modality_concat_labels = all_modality_concat_labels,
-                         subject = subject, region_approach = region_approach,
-                         HRFlag_process = HRFlag_process,
-                         results_outpath = results_outpath,
-                         resolution = resolution, 
-                         parcel_no = parcel_no)
-            
+        all_modality_concat_bold, all_modality_concat_labels = _generate_all_modality_files(subject, 
+                                                                                            modalities,
+                                                                                            region_approach,
+                                                                                            HRFlag_process,
+                                                                                            proc_data_path,
+                                                                                            resolution)
 
-        elif decoder == 'knn': 
-            print(colored(('K-Nearest Neighbours classifier'), attrs=['bold']))
-            _knn_decoder(all_modality_concat_bold = all_modality_concat_bold, 
-                         all_modality_concat_labels = all_modality_concat_labels,
-                         subject = subject, 
-                         region_approach = region_approach,
-                         HRFlag_process = HRFlag_process,
-                         results_outpath = results_outpath,
-                         resolution = resolution)
-            
+        # getting the number of parcels, useful for soft parcellatin approaches like dypac        
+        df_path = proc_data_path + 'medial_data/fMRI2/{}/{}/{}/{}_wm_fMRI2.npy'. format(region_approach, 
+                                                                                         resolution, 
+                                                                                         subject, subject) 
+        df = np.load(df_path)
+    #     print(df)
+        parcel_no = int(len(df[0][:][1]))
 
-        elif decoder == 'random_forest': 
-            print(colored(('Random Forest classifier'), attrs=['bold']))
-            _random_forest_decoder(all_modality_concat_bold = all_modality_concat_bold, 
-                                   all_modality_concat_labels = all_modality_concat_labels,
-                                   subject = subject, 
-                                   region_approach = region_approach, 
-                                   HRFlag_process = HRFlag_process,
-                                   results_outpath = results_outpath,
-                                   resolution = resolution)
-            
-            
-        elif decoder == 'grid_svm': 
-            print(colored(('Support Vector Machine classifier with grid search'), attrs=['bold']))
-            _grid_svm_decoder(all_modality_concat_bold = all_modality_concat_bold, 
-                              all_modality_concat_labels = all_modality_concat_labels,
-                              subject = subject, 
-                              region_approach = region_approach, 
-                              HRFlag_process = HRFlag_process,
-                              results_outpath = results_outpath,
-                              resolution = resolution) 
-            
-            
-        elif decoder == 'grid_mlp': 
-            print(colored(('Multi Layer Perceptron Neural Networks classifier with grid search'), attrs=['bold']))
-            _grid_mlp_decoder(all_modality_concat_bold = all_modality_concat_bold, 
-                              all_modality_concat_labels = all_modality_concat_labels,
-                              subject = subject, 
-                              region_approach = region_approach, 
-                              HRFlag_process = HRFlag_process,
-                              results_outpath = results_outpath,
-                              resolution = resolution,
-                              parcel_no = parcel_no)        
-            
-            
-        elif decoder == 'grid_knn': 
-            print(colored(('K-Nearest Neighbor classifier with grid search'), attrs=['bold']))
-            _grid_knn_decoder(all_modality_concat_bold = all_modality_concat_bold, 
-                              all_modality_concat_labels = all_modality_concat_labels,
-                              subject = subject, 
-                              region_approach = region_approach, 
-                              HRFlag_process = HRFlag_process,
-                              results_outpath = results_outpath,
-                              resolution = resolution) 
+        print('all_modality_concat_bold shape', np.shape(all_modality_concat_bold))
+        print('all_modality_concat_labels shape', np.shape(all_modality_concat_labels),'\n')
 
-            
-        elif decoder == 'grid_random_forest': 
-            print(colored(('Random Forest classifier with grid search'), attrs=['bold']))
-            _grid_random_forest_decoder(all_modality_concat_bold = all_modality_concat_bold, 
-                                        all_modality_concat_labels = all_modality_concat_labels,
-                                        subject = subject, 
-                                        region_approach = region_approach, 
-                                        HRFlag_process = HRFlag_process,
-                                        results_outpath = results_outpath,
-                                        resolution = resolution)
-            
-            
-        elif decoder == 'grid_logistic_regression': 
-            print(colored(('Logistic Regression classifier with grid search'), attrs=['bold']))
-            _grid_logistic_regression_decoder(all_modality_concat_bold = all_modality_concat_bold, 
-                                              all_modality_concat_labels = all_modality_concat_labels,
-                                              subject = subject, 
-                                              region_approach = region_approach, 
-                                              HRFlag_process = HRFlag_process,
-                                              results_outpath = results_outpath,
-                                              resolution = resolution)
-            
-            
-        elif decoder == 'grid_ridge': 
-            print(colored(('Ridge Regression classifier with grid search'), attrs=['bold']))
-            _grid_ridge_decoder(all_modality_concat_bold = all_modality_concat_bold, 
-                                all_modality_concat_labels = all_modality_concat_labels,
-                                subject = subject, 
-                                region_approach = region_approach, 
-                                HRFlag_process = HRFlag_process,
-                                results_outpath = results_outpath,
-                                resolution = resolution)
-            
-            
-        elif decoder == 'grid_bagging': 
-            print(colored(('Bagged Decision Trees classifier with grid search'), attrs=['bold']))
-            _grid_bagging_decoder(all_modality_concat_bold = all_modality_concat_bold, 
-                                  all_modality_concat_labels = all_modality_concat_labels,
-                                  subject = subject, 
-                                  region_approach = region_approach, 
-                                  HRFlag_process = HRFlag_process,
-                                  results_outpath = results_outpath,
-                                  resolution = resolution)
-            
-            
-        elif decoder == 'grid_gaussian_nb': 
-            print(colored(('Gaussian Naive Bayes classifier with grid search'), attrs=['bold']))
-            _grid_gaussian_nb_decoder(all_modality_concat_bold = all_modality_concat_bold, 
-                                       all_modality_concat_labels = all_modality_concat_labels,
-                                       subject = subject, 
-                                       region_approach = region_approach, 
-                                       HRFlag_process = HRFlag_process,
-                                       results_outpath = results_outpath,
-                                       resolution = resolution)
-            
-                                    
-        else:
-            print('The model is not defined')
+
+        for decoder in decoders:
+
+            if decoder == 'svm':
+                print(colored(('Support Vector Machine classifier:'),attrs=['bold']))
+                _svm_decoder(all_modality_concat_bold=all_modality_concat_bold, 
+                             all_modality_concat_labels=all_modality_concat_labels,
+                             subject=subject, 
+                             region_approach=region_approach, 
+                             HRFlag_process=HRFlag_process, 
+                             results_outpath=results_outpath,
+                             resolution=resolution)
+
+
+            elif decoder == 'mlp': 
+                print(colored(('Multi Layer Perceptron Neural Networks classifier'\
+                               '(two dense layers):'), attrs=['bold']))
+                _mlp_decoder(all_modality_concat_bold=all_modality_concat_bold, 
+                             all_modality_concat_labels=all_modality_concat_labels,
+                             subject=subject, 
+                             region_approach=region_approach,
+                             HRFlag_process=HRFlag_process,
+                             results_outpath=results_outpath,
+                             resolution=resolution)
+
+
+            elif decoder == 'knn': 
+                print(colored(('K-Nearest Neighbours classifier'), attrs=['bold']))
+                _knn_decoder(all_modality_concat_bold=all_modality_concat_bold, 
+                             all_modality_concat_labels=all_modality_concat_labels,
+                             subject=subject, 
+                             region_approach=region_approach,
+                             HRFlag_process=HRFlag_process,
+                             results_outpath=results_outpath,
+                             resolution=resolution)
+
+
+            elif decoder == 'random_forest': 
+                print(colored(('Random Forest classifier'), attrs=['bold']))
+                _random_forest_decoder(all_modality_concat_bold=all_modality_concat_bold, 
+                                       all_modality_concat_labels=all_modality_concat_labels,
+                                       subject=subject, 
+                                       region_approach=region_approach, 
+                                       HRFlag_process=HRFlag_process,
+                                       results_outpath=results_outpath,
+                                       resolution=resolution)
+
+
+            elif decoder == 'grid_svm': 
+                print(colored(('Support Vector Machine classifier with grid search'), attrs=['bold']))
+                _grid_svm_decoder(all_modality_concat_bold=all_modality_concat_bold, 
+                                  all_modality_concat_labels=all_modality_concat_labels,
+                                  subject=subject, 
+                                  region_approach=region_approach, 
+                                  HRFlag_process=HRFlag_process,
+                                  results_outpath=results_outpath,
+                                  resolution=resolution) 
+
+
+            elif decoder == 'grid_mlp': 
+                print(colored(('Multi Layer Perceptron Neural Networks classifier with grid search'), attrs=['bold']))
+                _grid_mlp_decoder(all_modality_concat_bold=all_modality_concat_bold, 
+                                  all_modality_concat_labels=all_modality_concat_labels,
+                                  subject=subject, 
+                                  region_approach=region_approach, 
+                                  HRFlag_process=HRFlag_process,
+                                  results_outpath=results_outpath,
+                                  resolution=resolution)        
+
+
+            elif decoder == 'grid_knn': 
+                print(colored(('K-Nearest Neighbor classifier with grid search'), attrs=['bold']))
+                _grid_knn_decoder(all_modality_concat_bold=all_modality_concat_bold, 
+                                  all_modality_concat_labels=all_modality_concat_labels,
+                                  subject=subject, 
+                                  region_approach=region_approach, 
+                                  HRFlag_process=HRFlag_process,
+                                  results_outpath=results_outpath,
+                                  resolution=resolution) 
+
+
+            elif decoder == 'grid_random_forest': 
+                print(colored(('Random Forest classifier with grid search'), attrs=['bold']))
+                _grid_random_forest_decoder(all_modality_concat_bold=all_modality_concat_bold, 
+                                            all_modality_concat_labels=all_modality_concat_labels,
+                                            subject=subject, 
+                                            region_approach=region_approach, 
+                                            HRFlag_process=HRFlag_process,
+                                            results_outpath=results_outpath,
+                                            resolution=resolution)
+
+
+            elif decoder == 'grid_logistic_regression': 
+                print(colored(('Logistic Regression classifier with grid search'), attrs=['bold']))
+                _grid_logistic_regression_decoder(all_modality_concat_bold=all_modality_concat_bold, 
+                                                  all_modality_concat_labels=all_modality_concat_labels,
+                                                  subject=subject, 
+                                                  region_approach=region_approach, 
+                                                  HRFlag_process=HRFlag_process,
+                                                  results_outpath=results_outpath,
+                                                  resolution=resolution)
+
+
+            elif decoder == 'grid_ridge': 
+                print(colored(('Ridge Regression classifier with grid search'), attrs=['bold']))
+                _grid_ridge_decoder(all_modality_concat_bold=all_modality_concat_bold, 
+                                    all_modality_concat_labels=all_modality_concat_labels,
+                                    subject=subject, 
+                                    region_approach=region_approach, 
+                                    HRFlag_process=HRFlag_process,
+                                    results_outpath=results_outpath,
+                                    resolution=resolution)
+
+
+            elif decoder == 'grid_bagging': 
+                print(colored(('Bagged Decision Trees classifier with grid search'), attrs=['bold']))
+                _grid_bagging_decoder(all_modality_concat_bold=all_modality_concat_bold, 
+                                      all_modality_concat_labels=all_modality_concat_labels,
+                                      subject=subject, 
+                                      region_approach=region_approach, 
+                                      HRFlag_process=HRFlag_process,
+                                      results_outpath=results_outpath,
+                                      resolution=resolution)
+
+
+            elif decoder == 'grid_gaussian_nb': 
+                print(colored(('Gaussian Naive Bayes classifier with grid search'), attrs=['bold']))
+                _grid_gaussian_nb_decoder(all_modality_concat_bold=all_modality_concat_bold, 
+                                           all_modality_concat_labels=all_modality_concat_labels,
+                                           subject=subject, 
+                                           region_approach=region_approach, 
+                                           HRFlag_process=HRFlag_process,
+                                           results_outpath=results_outpath,
+                                           resolution=resolution)
+
+
+            else:
+                print('The model is not defined')
                         
                         
                         
