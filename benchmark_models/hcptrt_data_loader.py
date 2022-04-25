@@ -10,6 +10,7 @@ from termcolor import colored
 import nilearn.datasets
 from dypac.masker import LabelsMasker, MapsMasker
 from nilearn.interfaces.fmriprep import load_confounds_strategy
+from time import time
 # from nilearn.interfaces.fmriprep import load_confounds
 
 """
@@ -117,6 +118,7 @@ class DataLoader():
                                                                           self.resolution), 
                                        standardize=True, smoothing_fwhm=5)
             
+            t0 = time()
             fmri_t = []
             for dpath in data_path:
                 print(dpath.split('func/', 1)[1])
@@ -125,22 +127,30 @@ class DataLoader():
                 
                 conf = load_confounds_strategy(dpath, denoise_strategy="simple",
                                                motion="basic", global_signal="basic") #new nilearn
+
                 data_fmri = masker.fit_transform(dpath, confounds=conf[0]) #new nilearn
                 fmri_t.append(data_fmri)
                 
 #                print(dpath.split('func/', 1)[1])
 #                print(data_fmri)
                 print('shape:', np.shape(data_fmri))
+
+            print("Data processing time for {} using {} with {} resolution:".format(self.subject, self.region_approach,
+                                                                                    self.resolution), round(time()-t0, 3), "s")
               
             
         elif self.region_approach == 'difumo':
             
-#             num_parcels = int(self.region_approach.split("_", 1)[1])
-            atlas = nilearn.datasets.fetch_atlas_difumo(data_dir=self.raw_atlas_dir, 
-                                                        dimension=self.resolution)
-            atlas_filename = atlas['maps']
-            atlas_labels = atlas['labels']            
-            masker = NiftiMapsMasker(maps_img=atlas['maps'], standardize=True, verbose=5)
+##             num_parcels = int(self.region_approach.split("_", 1)[1])
+#            atlas = nilearn.datasets.fetch_atlas_difumo(data_dir=self.raw_atlas_dir, 
+#                                                        dimension=self.resolution)
+#            atlas_filename = atlas['maps']
+#           atlas_labels = atlas['labels']
+            t0 = time()
+            atlas_filename = os.path.join(self.raw_atlas_dir + '/{}_atlases/{}/3mm/maps.nii.gz'.format(self.region_approach,
+                                                                                                       self.resolution))
+            masker = NiftiMapsMasker(maps_img=atlas_filename, standardize=True, 
+                                     verbose=5, smoothing_fwhm=5)
             
             fmri_t = []
             for dpath in data_path:    
@@ -148,10 +158,40 @@ class DataLoader():
                 
                 conf = load_confounds_strategy(dpath, denoise_strategy="simple",
                                                motion="basic", global_signal="basic") #new nilearn
+
                 data_fmri = masker.fit_transform(dpath, confounds=conf[0]) #new nilearn
-                
                 fmri_t.append(data_fmri)
-        
+
+                print('shape:', np.shape(data_fmri))
+
+            print("Data processing time for {} using {} with {} resolution:".format(self.subject, self.region_approach,
+                                                                                    self.resolution), round(time()-t0, 3), "s")
+
+
+        elif self.region_approach == 'schaefer':
+
+            t0 = time()
+            atlas_filename = os.path.join(self.raw_atlas_dir + '/{}_2018/Schaefer2018_{}Parcels_7Networks'\
+                                                               '_order_FSLMNI152_1mm.nii.gz'.format(self.region_approach,
+                                                                                                    self.resolution))
+
+            masker = NiftiLabelsMasker(labels_img=atlas_filename, standardize=True,
+                                       verbose=5, smoothing_fwhm=5)
+
+            fmri_t = []
+            for dpath in data_path:
+#                 data_fmri = masker.fit_transform(dpath, confounds=self.confounds.load(dpath)) #old nilearn
+
+                conf = load_confounds_strategy(dpath, denoise_strategy="simple",
+                                               motion="basic", global_signal="basic") #new nilearn
+                data_fmri = masker.fit_transform(dpath, confounds=conf[0]) #new nilearn
+                fmri_t.append(data_fmri)
+
+                print('shape:', np.shape(data_fmri))
+            print("Data processing time for {} using {} with {} resolution:".format(self.subject, self.region_approach,
+                                                                                    self.resolution), round(time()-t0, 3), "s")
+
+
 
         elif self.region_approach == 'dypac':
             
@@ -277,7 +317,7 @@ class DataLoader():
                                                                 'Face_0-Back','Face_2-Back',
                                                                 'Place_0-Back','Place_2-Back',
                                                                 'Tools_0-Back','Tools_2-Back'],
-                                                               ['zbody0b','body2b','face0b',
+                                                               ['body0b','body2b','face0b',
                                                                 'face2b','place0b','place2b',
                                                                 'tool0b','tool2b'])
             
@@ -435,7 +475,4 @@ def postproc_data_loader(subject, modalities, region_approach, resolution): # co
 
 #             _save_files(events_files, subject, modality,  
 #                         events2_out_path, region_approach) #واسه وقتی فقط میخوام ایونت رو تغییر بدم 
-
-        print('#############################################################')
-    
 
