@@ -1,3 +1,4 @@
+import os
 import matplotlib.pyplot as plt
 import seaborn as sn
 import pandas as pd
@@ -35,11 +36,16 @@ def classifier_history(history, title, results_outpath, output_file_name):
     
     
     
-def conf_matrix(model_conf_matrix, unique_conditions, title, results_outpath, output_file_name):
+def conf_matrix(model_cm, unique_conditions, title, results_outpath, output_file_name):
     
-    df_cm = pd.DataFrame(model_conf_matrix, index = unique_conditions, 
+    df_cm = pd.DataFrame(model_cm, index = unique_conditions, 
                          columns = unique_conditions)
-    df_cm.to_csv(results_outpath + output_file_name + '.csv')
+    cm_results_outpath = results_outpath + 'cm_results/'
+    
+    if not os.path.exists(cm_results_outpath):
+        os.makedirs(cm_results_outpath)
+    
+    df_cm.to_csv(cm_results_outpath + output_file_name + '.csv')
     plt.figure(figsize = (20,14))
     sn.heatmap(df_cm, annot = True, cmap = 'Blues', square = True)
     plt.xticks(rotation = 45)
