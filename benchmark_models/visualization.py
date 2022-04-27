@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sn
 import pandas as pd
@@ -6,6 +7,8 @@ from sklearn.metrics import confusion_matrix
 from nilearn import plotting
 from nilearn.plotting import plot_matrix
 import seaborn as sn
+#from csv import DictWriter
+from csv import writer
 
 
 
@@ -18,7 +21,7 @@ def classifier_history(history, title, results_outpath, output_file_name):
     plt.title(title + 'model accuracy')
     plt.ylabel('accuracy')
     plt.xlabel('epoch')
-    plt.legend(['train', 'validation'], loc = 'upper left')
+    plt.legend(['train', 'validation'], loc='upper left')
     plt.show()
     plt.savefig(results_outpath + output_file_name + '_modelـaccuracy.png', 
                 dpi=300, bbox_inches='tight')
@@ -29,31 +32,40 @@ def classifier_history(history, title, results_outpath, output_file_name):
     plt.title(title + 'model loss')
     plt.ylabel('loss')
     plt.xlabel('epoch')
-    plt.legend(['train', 'validation'], loc = 'upper left')
+    plt.legend(['train', 'validation'], loc='upper left')
     plt.show()
     plt.savefig(results_outpath + output_file_name + '_modelـloss.png', 
                 dpi=300, bbox_inches='tight')
     
     
     
-def conf_matrix(model_cm, unique_conditions, title, results_outpath, output_file_name):
+def conf_matrix(model_cm, unique_conditions, title, cm_results_outpath, output_file_name, 
+                decoder, subject, region_approach, resolution, HRFlag_process):
     
-    df_cm = pd.DataFrame(model_cm, index = unique_conditions, 
-                         columns = unique_conditions)
-    cm_results_outpath = results_outpath + 'cm_results/'
+    df_cm = pd.DataFrame(model_cm, index=unique_conditions, 
+                         columns=unique_conditions)
     
-    if not os.path.exists(cm_results_outpath):
-        os.makedirs(cm_results_outpath)
-    
-    df_cm.to_csv(cm_results_outpath + output_file_name + '.csv')
-    plt.figure(figsize = (20,14))
-    sn.heatmap(df_cm, annot = True, cmap = 'Blues', square = True)
-    plt.xticks(rotation = 45)
-    plt.title(title , fontsize = 15, fontweight = 'bold')
-    plt.xlabel("true labels", fontsize = 14, fontweight = 'bold')
-    plt.ylabel("predicted labels", fontsize = 14, fontweight = 'bold')
-    plt.show()
+    # Adding decoding info to the summary results file
+    cm_diag = np.diag(df_cm, k=0)
+    cm_smry = np.append([subject, decoder, region_approach,
+                         resolution, HRFlag_process], cm_diag)
 
+    with open(cm_results_outpath + 'results_summary.csv', 'a+', newline='') as write_obj:
+        csv_writer = writer(write_obj)
+        csv_writer.writerow(cm_smry) 
+
+    
+    # Saving CM files
+    df_cm.to_csv(cm_results_outpath + output_file_name + '.csv')
+    plt.figure(figsize=(20,14))
+    sn.heatmap(df_cm, annot=True, cmap='Blues', square = True)
+    plt.xticks(rotation=45)
+    plt.title(title , fontsize=15, fontweight='bold')
+    plt.xlabel("true labels", fontsize=14, fontweight='bold')
+    plt.ylabel("predicted labels", fontsize=14, fontweight='bold')
+    plt.show()
+     
+    
     
     
 def plot_cv_indices(cv, X, y, group, ax, n_splits, lw=10):
