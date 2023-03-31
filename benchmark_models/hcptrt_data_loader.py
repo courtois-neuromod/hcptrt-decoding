@@ -12,6 +12,9 @@ from dypac.masker import LabelsMasker, MapsMasker
 from nilearn.interfaces.fmriprep import load_confounds_strategy
 from time import time
 # from nilearn.interfaces.fmriprep import load_confounds
+import sys
+sys.path.append(os.path.join("../"))
+import utils
 
 """
 Utilities for first step of reading and processing hcptrt data.
@@ -254,7 +257,7 @@ class DataLoader():
     def _load_events_files(self):
         
         """
-        Output is a list of relabeled events file (15 for each modality)
+        Output is a list of relabeled events file.
         """
 
         events_path = sorted(glob.glob(self.pathevents + '{}/**/func/*{}*_events.tsv'
@@ -265,9 +268,11 @@ class DataLoader():
         if (len(events_path) > 14):
             events_extra_files = len(events_path) - 14
             print(colored('Regressed out {} extra following events file(s):'
-                          .format(events_extra_files), 'red', attrs=['bold'])) 
+                          .format(events_extra_files), 'red', attrs=['bold']))
+
             for i in range(14, len(events_path)):
                 print(colored(events_path[i].split('func/', 1)[1], 'red'))
+
             for i in range(14, len(events_path)):
                 events_path.pop()            
 
@@ -275,11 +280,16 @@ class DataLoader():
         
         # Labeling the conditions
         events_files = []
-        for epath in events_path: 
+        count = 1
+        count_str=str(count)
+
+        for epath in events_path:
+
             event = pd.read_csv(epath, sep="\t", encoding="utf8")
             print(epath.split('func/', 1)[1])
+            print(event.head(5))
             print(np.shape(event))
- #           print(np.unique(event.trial_type))
+            print(np.unique(event.trial_type))
             
             if self.modality == 'emotion': 
                 event.trial_type = event['trial_type'].replace(['response_face',
@@ -325,7 +335,31 @@ class DataLoader():
 #            print(np.unique(event.trial_type), '\n')
 #            print(event.trial_type.head(20))
 
+#----------------------------------------------------------------------------------
+            conditions = list(event.trial_type)
+#            print('conditions:', conditions)
+
+            session_idx = []
+            count_idx = []
+            for condition in conditions:
+
+                ses = epath.split('_task')[0].split('func/')[1].partition('_')[2]
+                temp_run = epath.split('run')[1]
+                run = utils.between(temp_run, "-", "_")
+                session = ses + '_run-' + run
+                session_idx.append(session)
+                count_idx.append(count)
+
+            event['session'] =  session_idx
+            event['count'] =  count_idx
+#            print(event)
+
+#----------------------------------------------------------------------------------
+
             events_files.append(event)
+
+            count += 1
+            count_str=str(count)
         
         print('### Reading events files is done!')
         print('-----------------------------------------------')
@@ -391,7 +425,7 @@ def _save_files(fmri_t, events_files, subject, modality,
                 fMRI2_out_path, events2_out_path):
     
 # def _save_files(events_files, subject, modality, 
-#                 events2_out_path, region_approach): #واسه وقتی فقط میخوام ایونت رو تغییر بدم
+#                 events2_out_path, region_approach):
     
     """
     - Save a matrix of preprocessed fMRI file for each task.
@@ -472,7 +506,4 @@ def postproc_data_loader(subject, modalities, region_approach, resolution): # co
 
         _save_files(fmri_t, events_files, subject, modality,  
                     fMRI2_out_path, events2_out_path)
-
-#             _save_files(events_files, subject, modality,  
-#                         events2_out_path, region_approach) #واسه وقتی فقط میخوام ایونت رو تغییر بدم 
 

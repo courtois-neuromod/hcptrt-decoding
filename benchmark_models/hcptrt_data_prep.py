@@ -6,7 +6,6 @@ import os
 import sys
 import nilearn.datasets
 from load_confounds import Params9, Params24
-#from nilearn.input_data import NiftiLabelsMasker, NiftiMasker, NiftiMapsMasker
 from nilearn.maskers import NiftiLabelsMasker, NiftiMasker, NiftiMapsMasker
 from nilearn.interfaces.fmriprep import load_confounds_strategy
 from sklearn import preprocessing
@@ -62,7 +61,7 @@ def _volume_labeling(bold_files, events_files, subject,
 
     data_lenght = len(bold_files)
     
-    labels_files = []    
+    labels_files, session_files = [], []    
     for events_file in events_files:
         task_durations = []
         task_modalities = []
@@ -129,9 +128,15 @@ def _volume_labeling(bold_files, events_files, subject,
         volume_labels = np.array(flat_list)
         labels_files.append(volume_labels)
 
+        for i in range(len(volume_labels)): #SHSH
+            session_files.append(events_file.iloc[-1]['session']) #SHSH
+
 
     flat_labels_files = [item for sublist in labels_files for item in sublist]
     flat_volume_labels = np.array(flat_labels_files)
+
+    flat_session_labels = np.array(session_files) #SHSH
+    flat_session_labels = flat_session_labels.reshape(-1, 1) #SHSH
 
     shape = np.shape(bold_files[1])[0]
     flat_volume_labels = np.reshape(flat_volume_labels, ((data_lenght)* shape, 1))# for 'gambling'
@@ -141,24 +146,29 @@ def _volume_labeling(bold_files, events_files, subject,
 #         del sublist[1]   # for 'gambling'
     flat_bold = [item for sublist in bold_files for item in sublist]
     flat_bold_files = np.array(flat_bold)  
-
+    
     # Cheking the same lenght of the flat bold and label file
     if (len(flat_bold_files[:, 0]) != len(flat_volume_labels[:, 0])):
         print('error: labels and bold flat files mismatche')
 
+    if (len(flat_bold_files[:, 0]) != len(flat_session_labels[:, 0])): #SHSH
+        print('error: session and bold flat files mismatche') #SHSH
+
         
     print('bold shape:', np.shape(flat_bold_files))
     print('events shape', np.shape(flat_volume_labels))
+    print('sessions shape', np.shape(flat_session_labels)) #SHSH
     
     print('bold type:', type(flat_bold_files))
     print('events type', type(flat_volume_labels)) 
+    print('sessions type', type(flat_session_labels)) #SHSH
  #   print(flat_volume_labels)
     print('### Concatenating fMRI & events files is done!')
     print('-----------------------------------------------')
     
     
     
-    return flat_bold_files, flat_volume_labels
+    return flat_bold_files, flat_volume_labels, flat_session_labels 
 
 
 
@@ -244,10 +254,11 @@ def _HRFlag_labeling(flat_volume_labels, HRFlag_process):
     return HRFlag_volume_labels
 
 
-def _unwanted_label_removal(events_files,HRFlag_volume_labels, 
-                            flat_bold_files,final_bold_out_path,
-                            final_labels_out_path,modality, 
-                            subject,region_approach,HRFlag_process):
+def _unwanted_label_removal(events_files, HRFlag_volume_labels, 
+                            flat_bold_files, flat_session_labels, 
+                            final_bold_out_path, final_labels_out_path,
+                            final_session_out_path, modality, subject,
+                            region_approach, HRFlag_process):  #SHSH
                                                                         
     categories = list(events_files[0].trial_type)
     unwanted = {'countdown','cross_fixation','Cue','new_bloc_right_hand', 
@@ -258,21 +269,27 @@ def _unwanted_label_removal(events_files,HRFlag_volume_labels,
     
     categories = [c for c in categories if c not in unwanted]
     conditions = list(set(categories))
-    num_cond = len(set(categories))
+#     num_cond = len(set(categories))
     
     final_volume_labels = []
+    final_session_labels = [] #SHSH
     parcel_no = np.shape(flat_bold_files[1])[0]
     final_bold_files = np.empty((0, parcel_no), int)
 
     for i in range (0, len(HRFlag_volume_labels)):
         if (HRFlag_volume_labels[i] not in unwanted):
             final_volume_labels.append(HRFlag_volume_labels[i])
+            final_session_labels.append(flat_session_labels[i]) #SHSH
             final_bold_files = np.append(final_bold_files, 
                                          np.array([flat_bold_files[i, :]]), axis=0)
                      
     final_label_path = final_labels_out_path + subject + '_' + modality + '_' + HRFlag_process + '_final_labels.csv'
     df_lable = pd.DataFrame(final_volume_labels)
     df_lable.to_csv(final_label_path, sep=',' ,index=False, header=None)
+
+    final_session_path = final_session_out_path + subject + '_' + modality + '_' + HRFlag_process + '_final_session.csv' #SHSH
+    df_session = pd.DataFrame(final_session_labels) #SHSH
+    df_session.to_csv(final_session_path, sep=',' ,index=False, header=None) #SHSH
 
 #     final_fMRI_path = proc_data_path + modality + '_volumes_final_fMRI.npy'
     final_fMRI_path = final_bold_out_path + subject + '_' + modality + '_' + HRFlag_process + '_final_fMRI.npy'
@@ -281,14 +298,17 @@ def _unwanted_label_removal(events_files,HRFlag_volume_labels,
     print('### Final volume label file is generated from events files!')
     print('File path:', final_label_path)
     print('-----------------------------------------------')
+    print('### Final volume session file is generated from sessions files!') #SHSH
+    print('File path:', final_session_path) #SHSH
+    print('-----------------------------------------------') #SHSH
     print('### Final numpy.ndarray file is generated from fMRI files!')
     print('File path:', final_fMRI_path)
 
-    return final_volume_labels, final_bold_files
+    return final_volume_labels, final_session_labels, final_bold_files  #SHSH
 
     
 
-def postproc_data_prep(subject, modalities, region_approach, HRFlag_process, resolution): # confounds, 
+def postproc_data_prep(split_set, subject, modalities, region_approach, HRFlag_process, resolution): # confounds, 
         
     """ 
     Outputs are 
@@ -299,7 +319,7 @@ def postproc_data_prep(subject, modalities, region_approach, HRFlag_process, res
 #    proc_data_path = '/home/SRastegarnia/hcptrt_decoding_Shima/data/'
 
     ##### CC #####
-    proc_data_path = '/home/rastegar/projects/def-pbellec/rastegar/hcptrt_decoding_shima/data/'
+    proc_data_path = '/home/rastegar/projects/def-pbellec/rastegar/hcptrt_decoding_shima/data/{}/'.format(split_set)
 
     bold_suffix = '_space-MNI152NLin2009cAsym_desc-preproc_bold.nii.gz'
     raw_atlas_dir = os.path.join(proc_data_path, "raw_atlas_dir")
@@ -339,20 +359,27 @@ def postproc_data_prep(subject, modalities, region_approach, HRFlag_process, res
 
     fMRI2_out_path = proc_data_path + 'medial_data/fMRI2/{}/{}/{}/'.format(region_approach,
                                                                            resolution, subject)
-    print(fMRI2_out_path)
+    
     events2_out_path = proc_data_path + 'medial_data/events2/{}/{}/{}/'.format(region_approach,
                                                                                resolution, subject)
 
     final_bold_out_path = proc_data_path + 'processed_data/proc_fMRI/{}/{}/{}/'.format(region_approach,
-                                                                                    resolution, subject)       
+                                                                                    resolution, subject)
+
     final_labels_out_path = proc_data_path + 'processed_data/proc_events/{}/{}/{}/'.format(region_approach,
                                                                                         resolution, subject)
+
+    final_session_out_path = proc_data_path + 'processed_data/proc_sessions/{}/{}/{}/'.format(region_approach,
+                                                                                        resolution, subject)  #SHSH
 
     if not os.path.exists(final_bold_out_path):
         os.makedirs(final_bold_out_path)
 
     if not os.path.exists(final_labels_out_path):
         os.makedirs(final_labels_out_path)
+
+    if not os.path.exists(final_session_out_path):  #SHSH
+        os.makedirs(final_session_out_path)  #SHSH
 
     for modality in modalities:
         print(colored(modality, attrs = ['bold']))
@@ -361,33 +388,34 @@ def postproc_data_prep(subject, modalities, region_approach, HRFlag_process, res
 #                                     'derivatives/fmriprep-20.2lts/fmriprep/{}/**/*{}*'
 #                                     .format(subject, modality) + bold_suffix, recursive = True)) 
 
-        data_path = sorted(glob.glob('/home/rastegar/scratch/hcptrt/'\
+        data_path = sorted(glob.glob('/home/rastegar/scratch/hcptrt/{}/'\
                                      'derivatives/fmriprep-20.2lts/fmriprep/{}/**/*{}*'
-                                     .format(subject, modality) + bold_suffix, recursive = True))
+                                     .format(split_set, subject, modality) + bold_suffix, recursive = True))
 
         bold_files = _reading_fMRI2(subject, modality, fMRI2_out_path, region_approach, resolution)
 #        print(bold_files)     
         events_files = _reading_events2(subject, modality, events2_out_path, region_approach, resolution)
         
-        flat_bold_files, flat_volume_labels = _volume_labeling(bold_files = bold_files,
-                                                               events_files = events_files, 
-                                                             #   confounds = confounds, 
-                                                               subject = subject, 
-                                                               modality = modality, 
-                                                               masker = masker, 
-                                                               data_path = data_path,
-                                                               TR = TR)
+        flat_bold_files, flat_volume_labels, flat_session_labels = _volume_labeling(bold_files = bold_files,
+                                                                                    events_files = events_files,  
+                                                                                    subject = subject, 
+                                                                                    modality = modality, 
+                                                                                    masker = masker, 
+                                                                                    data_path = data_path,
+                                                                                    TR = TR)  #SHSH
 
         HRFlag_volume_labels = _HRFlag_labeling(flat_volume_labels,HRFlag_process)
 
-        final_volume_labels, final_bold_files = _unwanted_label_removal(events_files, 
-                                                                        HRFlag_volume_labels, 
-                                                                        flat_bold_files, 
-                                                                        final_bold_out_path,
-                                                                        final_labels_out_path, 
-                                                                        modality, subject,
-                                                                        region_approach,
-                                                                        HRFlag_process)    
+        final_volume_labels, final_session_labels, final_bold_files = _unwanted_label_removal(events_files, 
+                                                                                             HRFlag_volume_labels, 
+                                                                                            flat_bold_files,
+                                                                                            flat_session_labels,
+                                                                                            final_bold_out_path,
+                                                                                            final_labels_out_path,
+                                                                                            final_session_out_path,
+                                                                                            modality, subject,
+                                                                                            region_approach,
+                                                                                            HRFlag_process)  #SHSH 
             
 ###############################################################################################################################
 

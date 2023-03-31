@@ -92,6 +92,7 @@ def _grid_svm_decoder(all_modality_concat_bold, all_modality_concat_labels,
     
     X = all_modality_concat_bold
     y = all_modality_concat_labels
+
     
     categories = np.unique(y)
     unique_conditions, order = np.unique(categories, return_index=True)
@@ -870,8 +871,8 @@ def _grid_gaussian_nb_decoder(all_modality_concat_bold, all_modality_concat_labe
 def postproc_benchmark_decoder(subjects, modalities, decoders, region_approach, 
                                HRFlag_process, resolution): 
     
-    home_dir = '/home/srastegarnia/hcptrt_decoding_Shima/' # elm
-#     home_dir = '/home/rastegar/projects/def-pbellec/rastegar/hcptrt_decoding_shima/' # CC
+#    home_dir = '/home/srastegarnia/hcptrt_decoding_Shima/' # elm
+    home_dir = '/home/rastegar/projects/def-pbellec/rastegar/hcptrt_decoding_shima/' # CC
 
     proc_data_path = home_dir + 'data/'
     
@@ -909,7 +910,8 @@ def postproc_benchmark_decoder(subjects, modalities, decoders, region_approach,
             writer = csv.writer(rslt_smry)
             writer.writerow(header)
                 
-
+        results_summary_file = cm_results_outpath + 'results_summary.csv' 
+        
         print('\n')
         print(colored((subject, region_approach, resolution, HRFlag_process),
                       'red',attrs=['bold']))
@@ -920,7 +922,7 @@ def postproc_benchmark_decoder(subjects, modalities, decoders, region_approach,
                                                                                             region_approach,
                                                                                             HRFlag_process,
                                                                                             proc_data_path,
-                                                                                            resolution)
+                                                                                        resolution)
 
         # getting the number of parcels, useful for soft parcellatin approaches like dypac        
         df_path = proc_data_path + 'medial_data/fMRI2/{}/{}/{}/{}_wm_fMRI2.npy'. format(region_approach, 
@@ -1087,4 +1089,4 @@ def postproc_benchmark_decoder(subjects, modalities, decoders, region_approach,
                         
                         
                         
-                          
+                      
